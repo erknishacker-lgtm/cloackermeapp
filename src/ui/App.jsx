@@ -11,14 +11,26 @@ import { LoginPage } from './pages/LoginPage.jsx';
 import { PlansPage } from './pages/PlansPage.jsx';
 import { SecurityPage } from './pages/SecurityPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
+import { TutorialPage } from './pages/TutorialPage.jsx';
+import { UsersPage } from './pages/UsersPage.jsx';
+
+function hasSeenTutorial() {
+  try {
+    return localStorage.getItem('cloaker_tutorial_done') === '1';
+  } catch {
+    return false;
+  }
+}
 
 export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [user, setUser] = useState(getStoredUser());
   const [activePage, setActivePage] = useState('dashboard');
+  const [firstRunTutorial, setFirstRunTutorial] = useState(false);
   const data = useDashboardData({ enabled: authChecked && !needsLogin });
   const activeCampaign = data.campaigns.find((c) => c.status === 'active') || data.campaigns[0];
+  const isAdmin = Boolean(user?.isAdmin || user?.role === 'owner' || user?.role === 'admin');
 
   useEffect(() => {
     let cancelled = false;
@@ -39,12 +51,15 @@ export default function App() {
             setUser(me.payload.user);
             setStoredUser(me.payload.user);
             setNeedsLogin(false);
-          } else if (me.status === 401) {
+            if (!hasSeenTutorial()) {
+              setFirstRunTutorial(true);
+              setActivePage('tutorial');
+            }
+          } else if (me.status === 401 || me.status === 403) {
             clearAdminToken();
             setUser(null);
             setNeedsLogin(true);
           } else {
-            // token legado / backend sem /me ainda
             const probe = await api.getCampaigns();
             if (probe.status === 401) {
               clearAdminToken();
@@ -80,6 +95,19 @@ export default function App() {
     setNeedsLogin(true);
   }
 
+  function enterApp(nextUser) {
+    const u = nextUser || getStoredUser();
+    setUser(u);
+    setNeedsLogin(false);
+    data.refreshData();
+    if (!hasSeenTutorial()) {
+      setFirstRunTutorial(true);
+      setActivePage('tutorial');
+    } else {
+      setActivePage('dashboard');
+    }
+  }
+
   if (!authChecked) {
     return (
       <div className="login-shell">
@@ -92,23 +120,25 @@ export default function App() {
   }
 
   if (needsLogin) {
-    return (
-      <LoginPage
-        onLoggedIn={(nextUser) => {
-          setUser(nextUser || getStoredUser());
-          setNeedsLogin(false);
-          data.refreshData();
-        }}
-      />
-    );
+    return <LoginPage onLoggedIn={enterApp} />;
   }
 
   let page;
-  if (activePage === 'dashboard') {
+  if (activePage === 'tutorial') {
+    page = (
+      <TutorialPage
+        isFirstRun={firstRunTutorial || !hasSeenTutorial()}
+        onComplete={() => {
+          setFirstRunTutorial(false);
+          setActivePage('dashboard');
+        }}
+      />
+    );
+  } else if (activePage === 'dashboard') {
     page = <DashboardPage stats={data.stats} events={data.events} />;
   } else if (activePage === 'access') {
     page = <AccessPage events={data.events} stats={data.stats} refreshData={data.refreshData} />;
-  } else if (activePage === 'domains') {
+  } else if (activePage === 'domains' && isAdmin) {
     page = (
       <DomainsPage
         domains={data.domains}
@@ -117,7 +147,7 @@ export default function App() {
         deleteDomain={data.deleteDomain}
       />
     );
-  } else if (activePage === 'security') {
+  } else if (activePage === 'security' && isAdmin) {
     page = (
       <SecurityPage
         events={data.events}
@@ -131,10 +161,27 @@ export default function App() {
         stats={data.stats}
       />
     );
-  } else if (activePage === 'plans') {
+  } else if (activePage === 'users' && isAdmin) {
+    page = (
+      <UsersPage
+        users={data.users}
+        createUser={data.createUser}
+        updateUser={data.updateUser}
+        deleteUser={data.deleteUser}
+        refreshUsers={data.refreshUsers}
+      />
+    );
+  } else if (activePage === 'plans' && isAdmin) {
     page = <PlansPage />;
   } else if (activePage === 'settings') {
-    page = <SettingsPage settings={data.settings} saveSettings={data.saveSettings} />;
+    page = (
+      <SettingsPage
+        settings={data.settings}
+        saveSettings={data.saveSettings}
+        changePassword={data.changePassword}
+        isAdmin={isAdmin}
+      />
+    );
   } else {
     page = (
       <CampaignsPage
@@ -148,22 +195,19 @@ export default function App() {
         domains={data.domains}
         updateCampaign={data.updateCampaign}
         deleteCampaign={data.deleteCampaign}
+        startCampaignTest={data.startCampaignTest}
       />
     );
   }
 
   return (
     <div className="app-shell">
-      <Sidebar
-        activePage={activePage}
-        setActivePage={setActivePage}
-        settings={data.settings}
-        user={user}
-        onLogout={logout}
-      />
+      <Sidebar activePage={activePage} setActivePage={setActivePage} user={user} onLogout={logout} />
       <main className={`content page-${activePage}`}>
         <div className="topbar">
-          <div />
+          <div className="topbar-title">
+            {activePage === 'tutorial' ? 'Tutorial' : null}
+          </div>
           <NotificationBell
             enabled={data.settings?.accessNotificationsEnabled !== false}
             onOpenAccess={() => {

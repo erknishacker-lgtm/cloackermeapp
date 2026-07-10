@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 import { seedCampaign } from '../utils/campaign.js';
+import { assignMissingCampaignOwners } from '../utils/access.js';
 import { emptyRouteLists, isBlockActive, normalizeRouteLists } from '../utils/ip.js';
-import { createOwnerUser, ensureOwnerUser } from '../utils/users.js';
+import { createOwnerUser, ensureOwnerUser, OWNER_ID } from '../utils/users.js';
 
 function emptyState(seedDemo = false) {
   return {
@@ -25,6 +26,7 @@ function emptyState(seedDemo = false) {
     customDomains: [],
     users: [createOwnerUser()],
     sessions: {},
+    testModes: {},
     notifications: [],
     settings: {
       allowSimulate: config.allowSimulate,
@@ -39,6 +41,7 @@ function emptyState(seedDemo = false) {
 function hydrateMaps(raw) {
   const base = emptyState(false);
   const users = ensureOwnerUser(raw.users || base.users);
+  const campaigns = assignMissingCampaignOwners(raw.campaigns || [], OWNER_ID);
   const state = {
     ...base,
     ...raw,
@@ -46,7 +49,8 @@ function hydrateMaps(raw) {
     blockedIps: new Map(Object.entries(raw.blockedIps || {})),
     violationsByIp: new Map(Object.entries(raw.violationsByIp || {})),
     sessions: new Map(Object.entries(raw.sessions || {})),
-    campaigns: raw.campaigns || [],
+    testModes: new Map(Object.entries(raw.testModes || {})),
+    campaigns,
     events: raw.events || [],
     globalDomains: raw.globalDomains || base.globalDomains,
     customDomains: raw.customDomains || [],
@@ -66,6 +70,7 @@ function serializeState(store) {
     blockedIps: Object.fromEntries(store.blockedIps),
     violationsByIp: Object.fromEntries(store.violationsByIp),
     sessions: Object.fromEntries(store.sessions),
+    testModes: Object.fromEntries(store.testModes || new Map()),
     routeLists: normalizeRouteLists(store.routeLists),
     globalDomains: store.globalDomains,
     customDomains: store.customDomains,
@@ -91,8 +96,12 @@ export function createStore(options = {}) {
     state = hydrateMaps(emptyState(options.seedDemo ?? false));
   }
 
-  // Always ensure owner exists after load
+  // Always ensure owner exists after load + migrate campaign ownership
   state.users = ensureOwnerUser(state.users);
+  state.campaigns = assignMissingCampaignOwners(state.campaigns, OWNER_ID);
+  if (!(state.testModes instanceof Map)) {
+    state.testModes = new Map(Object.entries(state.testModes || {}));
+  }
 
   let writeTimer = null;
 
@@ -119,6 +128,11 @@ export function createStore(options = {}) {
     for (const [token, session] of state.sessions.entries()) {
       if (session.expiresAt && new Date(session.expiresAt).getTime() <= now) {
         state.sessions.delete(token);
+      }
+    }
+    for (const [token, test] of state.testModes.entries()) {
+      if (test.expiresAt && new Date(test.expiresAt).getTime() <= now) {
+        state.testModes.delete(token);
       }
     }
   }
@@ -170,6 +184,9 @@ export function createStore(options = {}) {
     },
     get sessions() {
       return state.sessions;
+    },
+    get testModes() {
+      return state.testModes;
     },
     get notifications() {
       return state.notifications;

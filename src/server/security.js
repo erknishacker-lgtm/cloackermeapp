@@ -237,6 +237,20 @@ export function evaluateRequest(input, campaign, state = {}) {
   const blockDatacenter = protection.blockDatacenterAsns !== false;
   const strictHeaders = protection.strictHeaders === true;
 
+  // Test mode cookie (mesmo IP do token, 1h) → sempre URL principal
+  if (input.testMode === true) {
+    recordHit(input, state);
+    return {
+      decision: 'allow',
+      riskScore: 0,
+      reasons: ['test_mode_cookie'],
+      targetUrl: getTargetUrl(campaign, device),
+      device,
+      country,
+      asn
+    };
+  }
+
   // 0) Listas admin: whitelist IP → real; blacklist IP/UA → blocked
   //    real = primaryUrl | blocked = fallbackUrl
   const listDecision = evaluateListRouting(input, state?.routeLists);

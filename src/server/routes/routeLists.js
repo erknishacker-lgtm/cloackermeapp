@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { isValidIpOrCidr, normalizeRouteLists } from '../utils/ip.js';
+import { requireActiveUser, requireAdmin } from '../utils/access.js';
+import { getClientIp, isValidIpOrCidr, normalizeRouteLists } from '../utils/ip.js';
 
 const LIST_KEYS = {
   'ua-blacklist': 'uaBlacklist',
@@ -21,11 +22,46 @@ function isValidListEntry(listKey, value) {
 export function createRouteListsRouter(store) {
   const router = Router();
 
-  router.get('/', (_req, res) => {
+  /** Cliente: descobre o IP atual (para tutorial / whitelist). */
+  router.get('/my-ip', (req, res) => {
+    if (!requireActiveUser(req, res)) return undefined;
+    const ip = getClientIp(req);
+    const lists = normalizeRouteLists(store.routeLists);
+    const onWhitelist = lists.ipWhitelist.some((entry) => entry === ip);
+    return res.json({ ip, onWhitelist });
+  });
+
+  /** Cliente: adiciona o proprio IP na whitelist global (autoatendimento). */
+  router.post('/my-ip', (req, res) => {
+    if (!requireActiveUser(req, res)) return undefined;
+    const ip = getClientIp(req);
+    if (!isValidIpOrCidr(ip) || ip === 'unknown') {
+      return res.status(400).json({
+        errors: ['ip_unavailable'],
+        message: 'Nao foi possivel detectar seu IP. Tente de outro rede ou peça ao admin.'
+      });
+    }
+    const current = normalizeRouteLists(store.routeLists);
+    if (!current.ipWhitelist.includes(ip)) {
+      current.ipWhitelist = [...current.ipWhitelist, ip];
+      store.routeLists = current;
+      store.touch();
+    }
+    return res.json({
+      ok: true,
+      ip,
+      onWhitelist: true,
+      message: 'Seu IP foi adicionado a whitelist. Acessos deste IP vao para a URL principal.'
+    });
+  });
+
+  router.get('/', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     res.json(normalizeRouteLists(store.routeLists));
   });
 
   router.put('/', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     const next = normalizeRouteLists({
       uaBlacklist: req.body?.uaBlacklist,
       ipBlacklist: req.body?.ipBlacklist,
@@ -49,6 +85,7 @@ export function createRouteListsRouter(store) {
   });
 
   router.post('/:list', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     const listKey = resolveListKey(req.params.list);
     if (!listKey) {
       return res.status(400).json({ errors: ['list_invalid'], message: 'Lista desconhecida.' });
@@ -74,6 +111,7 @@ export function createRouteListsRouter(store) {
   });
 
   router.delete('/:list', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     const listKey = resolveListKey(req.params.list);
     if (!listKey) {
       return res.status(400).json({ errors: ['list_invalid'] });

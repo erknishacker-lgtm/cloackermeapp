@@ -1,12 +1,10 @@
-import { Lock, UserPlus } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { api, setAdminToken, setStoredUser } from '../api/client.js';
 
 export function LoginPage({ onLoggedIn }) {
-  const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,14 +14,7 @@ export function LoginPage({ onLoggedIn }) {
     setError('');
 
     try {
-      const result =
-        mode === 'login'
-          ? await api.login(username.trim(), password)
-          : await api.register({
-              username: username.trim(),
-              password,
-              displayName: displayName.trim() || username.trim()
-            });
+      const result = await api.login(username.trim(), password);
 
       if (!result.ok) {
         setError(result.payload?.message || result.payload?.errors?.join(', ') || 'Falha na autenticacao.');
@@ -45,27 +36,11 @@ export function LoginPage({ onLoggedIn }) {
       <form className="panel login-card" onSubmit={submit}>
         <div className="login-brand">
           <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo large" />
-          <p className="login-subtitle">{mode === 'login' ? 'Entre no painel' : 'Crie sua conta'}</p>
+          <p className="login-subtitle">Entre no painel</p>
         </div>
-
-        <div className="auth-tabs">
-          <button type="button" className={mode === 'login' ? 'selected' : ''} onClick={() => setMode('login')}>
-            Login
-          </button>
-          <button type="button" className={mode === 'register' ? 'selected' : ''} onClick={() => setMode('register')}>
-            Cadastro
-          </button>
-        </div>
-
-        {mode === 'register' && (
-          <label className="field">
-            <span>Nome de exibicao</span>
-            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Seu nome" />
-          </label>
-        )}
 
         <label className="field">
-          <span>Usuario</span>
+          <span>Usuario ou e-mail</span>
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -82,22 +57,18 @@ export function LoginPage({ onLoggedIn }) {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="••••••••"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            autoComplete="current-password"
           />
         </label>
 
         {error && <div className="message error-banner">{error}</div>}
 
         <button className="submit-button" type="submit" disabled={loading || !username.trim() || !password}>
-          {mode === 'login' ? <Lock size={18} /> : <UserPlus size={18} />}
-          {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
+          <Lock size={18} />
+          {loading ? 'Aguarde...' : 'Entrar'}
         </button>
 
-        {mode === 'login' && (
-          <p className="login-hint">
-            Perfil principal: <strong>louzada</strong> (acesso total liberado)
-          </p>
-        )}
+        <p className="login-hint">Cadastro publico fechado. Contas sao criadas pelo administrador.</p>
       </form>
     </div>
   );

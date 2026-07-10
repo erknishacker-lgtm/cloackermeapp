@@ -47,6 +47,12 @@ export function adminAuth(store) {
       } else {
         const user = store.users.find((item) => item.id === session.userId);
         if (user) {
+          if (user.active === false && user.role !== 'owner' && user.username !== 'louzada') {
+            return res.status(403).json({
+              errors: ['user_disabled'],
+              message: 'Usuario desativado. Contate o admin.'
+            });
+          }
           req.authUser = user;
           req.authToken = provided;
           return next();

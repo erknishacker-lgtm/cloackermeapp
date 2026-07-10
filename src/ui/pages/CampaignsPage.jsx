@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  FlaskConical,
   Monitor,
   Pause,
   Play,
@@ -22,7 +23,8 @@ export function CampaignsPage({
   activeCampaign,
   domains,
   updateCampaign,
-  deleteCampaign
+  deleteCampaign,
+  startCampaignTest
 }) {
   const publicUrl = activeCampaign ? `/r/${activeCampaign.slug}` : '';
   const domainOptions = [
@@ -271,6 +273,14 @@ export function CampaignsPage({
                     </span>
                   </div>
                   <div className="campaign-actions">
+                    <button
+                      type="button"
+                      className="icon-button"
+                      title="Testar campanha (cookie 1h → URL principal)"
+                      onClick={() => startCampaignTest?.(campaign)}
+                    >
+                      <FlaskConical size={16} />
+                    </button>
                     <button
                       type="button"
                       className="icon-button"

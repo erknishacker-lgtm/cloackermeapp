@@ -32,6 +32,7 @@ export function useDashboardData({ enabled = true } = {}) {
     ipBlacklist: [],
     ipWhitelist: []
   });
+  const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState({
     allowSimulate: true,
     autoBlockEnabled: true,
@@ -47,14 +48,12 @@ export function useDashboardData({ enabled = true } = {}) {
   const refreshData = useCallback(async () => {
     if (!enabled) return;
     try {
-      const [campaignsRes, eventsRes, statsRes, domainsRes, blockedRes, settingsRes, listsRes] = await Promise.all([
+      const [campaignsRes, eventsRes, statsRes, domainsRes, settingsRes] = await Promise.all([
         api.getCampaigns(),
         api.getEvents({ limit: 100 }),
         api.getStats(),
         api.getDomains(),
-        api.getBlockedIps(),
-        api.getSettings(),
-        api.getRouteLists()
+        api.getSettings()
       ]);
 
       if (campaignsRes.status === 401) {
@@ -67,7 +66,12 @@ export function useDashboardData({ enabled = true } = {}) {
       setEvents(eventsRes.payload || []);
       setStats({ ...emptyStats, ...(statsRes.payload || {}) });
       setDomains(domainsRes.payload || { global: [], custom: [] });
-      setBlockedIps(blockedRes.payload || []);
+      if (settingsRes.ok && settingsRes.payload) setSettings(settingsRes.payload);
+
+      // Admin-only payloads (ignore 403 for clientes)
+      const [blockedRes, listsRes] = await Promise.all([api.getBlockedIps(), api.getRouteLists()]);
+      if (blockedRes.ok) setBlockedIps(blockedRes.payload || []);
+      else setBlockedIps([]);
       if (listsRes.ok && listsRes.payload) {
         setRouteLists({
           uaBlacklist: listsRes.payload.uaBlacklist || [],
@@ -75,7 +79,7 @@ export function useDashboardData({ enabled = true } = {}) {
           ipWhitelist: listsRes.payload.ipWhitelist || []
         });
       }
-      if (settingsRes.ok && settingsRes.payload) setSettings(settingsRes.payload);
+
       setError('');
     } catch {
       setError('Backend indisponivel. Verifique o deploy no EasyPanel.');
@@ -233,6 +237,88 @@ export function useDashboardData({ enabled = true } = {}) {
     }
   }
 
+  async function changePassword(body) {
+    try {
+      const { response, payload } = await api.changePassword(body);
+      if (!response.ok) {
+        return { ok: false, message: payload?.message || payload?.errors?.join(', ') || 'Erro ao trocar senha.' };
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'Falha ao conectar no backend.' };
+    }
+  }
+
+  const refreshUsers = useCallback(async () => {
+    try {
+      const { response, payload } = await api.getUsers();
+      if (response.ok) setUsers(payload || []);
+      else setUsers([]);
+    } catch {
+      setUsers([]);
+    }
+  }, []);
+
+  async function createUser(body) {
+    try {
+      const { response, payload } = await api.createUser(body);
+      if (!response.ok) {
+        return { ok: false, message: payload?.message || payload?.errors?.join(', ') || 'Erro ao criar.' };
+      }
+      await refreshUsers();
+      return {
+        ok: true,
+        temporaryPassword: payload?.temporaryPassword,
+        message: payload?.message
+      };
+    } catch {
+      return { ok: false, message: 'Falha ao conectar no backend.' };
+    }
+  }
+
+  async function updateUser(id, body) {
+    try {
+      const { response, payload } = await api.updateUser(id, body);
+      if (!response.ok) {
+        return { ok: false, message: payload?.message || 'Erro ao atualizar.' };
+      }
+      await refreshUsers();
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'Falha ao conectar no backend.' };
+    }
+  }
+
+  async function deleteUser(id) {
+    try {
+      const { response, payload } = await api.deleteUser(id);
+      if (!response.ok) {
+        return { ok: false, message: payload?.message || 'Erro ao excluir.' };
+      }
+      await refreshUsers();
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'Falha ao conectar no backend.' };
+    }
+  }
+
+  async function startCampaignTest(campaign) {
+    try {
+      const { response, payload } = await api.startCampaignTest(campaign.id || campaign.slug);
+      if (!response.ok) {
+        setMessage(payload?.message || 'Nao foi possivel iniciar o teste.');
+        return { ok: false };
+      }
+      const url = payload?.testUrl || `/r/${campaign.slug}?test=1`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setMessage('Modo teste ativo por 1h neste navegador/IP. Nova aba aberta na URL principal.');
+      return { ok: true };
+    } catch {
+      setMessage('Falha ao conectar no backend.');
+      return { ok: false };
+    }
+  }
+
   return {
     form,
     updateField,
@@ -240,6 +326,7 @@ export function useDashboardData({ enabled = true } = {}) {
     campaigns,
     updateCampaign,
     deleteCampaign,
+    startCampaignTest,
     events,
     domains,
     createDomain,
@@ -251,8 +338,14 @@ export function useDashboardData({ enabled = true } = {}) {
     routeLists,
     addRouteListEntry,
     removeRouteListEntry,
+    users,
+    refreshUsers,
+    createUser,
+    updateUser,
+    deleteUser,
     settings,
     saveSettings,
+    changePassword,
     stats,
     message,
     loading,

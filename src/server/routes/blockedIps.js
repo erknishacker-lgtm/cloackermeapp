@@ -1,15 +1,18 @@
 import { Router } from 'express';
+import { requireAdmin } from '../utils/access.js';
 import { isValidIpOrCidr, serializeBlockedIp } from '../utils/ip.js';
 
 export function createBlockedIpsRouter(store) {
   const router = Router();
 
-  router.get('/', (_req, res) => {
+  router.get('/', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     store.pruneExpiredBlocks();
     res.json(Array.from(store.blockedIps.values()).map(serializeBlockedIp));
   });
 
   router.post('/', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     const ip = String(req.body?.ip || '').trim();
 
     if (!ip) {
@@ -33,6 +36,7 @@ export function createBlockedIpsRouter(store) {
   });
 
   router.delete('/:ip', (req, res) => {
+    if (!requireAdmin(req, res)) return undefined;
     if (!store.blockedIps.delete(req.params.ip)) {
       return res.status(404).json({ errors: ['ip_not_found'] });
     }

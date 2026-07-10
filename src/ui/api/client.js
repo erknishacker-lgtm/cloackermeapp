@@ -79,14 +79,21 @@ export const api = {
 
   login: (username, password) =>
     request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  register: (body) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request('/api/auth/me'),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
+  changePassword: (body) =>
+    request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
+
+  getUsers: () => request('/api/auth/users'),
+  createUser: (body) => request('/api/auth/users', { method: 'POST', body: JSON.stringify(body) }),
+  updateUser: (id, body) => request(`/api/auth/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteUser: (id) => request(`/api/auth/users/${id}`, { method: 'DELETE' }),
 
   getCampaigns: () => request('/api/campaigns'),
   createCampaign: (body) => request('/api/campaigns', { method: 'POST', body: JSON.stringify(body) }),
   updateCampaign: (id, body) => request(`/api/campaigns/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteCampaign: (id) => request(`/api/campaigns/${id}`, { method: 'DELETE' }),
+  startCampaignTest: (id) => request(`/api/campaigns/${id}/test-mode`, { method: 'POST' }),
 
   getEvents: (params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -105,6 +112,8 @@ export const api = {
   deleteBlockedIp: (ip) => request(`/api/blocked-ips/${encodeURIComponent(ip)}`, { method: 'DELETE' }),
 
   getRouteLists: () => request('/api/route-lists'),
+  getMyIp: () => request('/api/route-lists/my-ip'),
+  addMyIpToWhitelist: () => request('/api/route-lists/my-ip', { method: 'POST' }),
   addRouteListEntry: (list, value) =>
     request(`/api/route-lists/${list}`, { method: 'POST', body: JSON.stringify({ value }) }),
   removeRouteListEntry: (list, value) =>

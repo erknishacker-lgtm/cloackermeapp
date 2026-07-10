@@ -23,6 +23,17 @@ export function createUserId(prefix = 'usr') {
   return `${prefix}_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
 }
 
+export function parseCookieHeader(cookieHeader = '', name) {
+  const cookie = String(cookieHeader || '');
+  const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  if (!match) return '';
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
 /** Stable hash for demo seed so restarts keep same password format. */
 export function hashPasswordStable(password, saltSeed = 'cloaker.lol') {
   const salt = createHash('sha256').update(saltSeed).digest('hex').slice(0, 32);

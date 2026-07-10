@@ -11,6 +11,7 @@ export function toCampaign(body = {}) {
 
   return {
     id: body.id || `cmp_${Date.now().toString(36)}`,
+    userId: body.userId || null,
     name: body.name || 'Nova Campanha',
     slug,
     primaryUrl: body.primaryUrl,
@@ -51,6 +52,7 @@ export function applyCampaignPatch(campaign, body = {}) {
 
   if (body.name !== undefined) next.name = body.name;
   if (body.slug !== undefined) next.slug = slugify(body.slug);
+  // userId so pode ser alterado pelo dono da campanha (evita sequestro)
   if (body.primaryUrl !== undefined) next.primaryUrl = body.primaryUrl;
   if (body.fallbackUrl !== undefined) next.fallbackUrl = body.fallbackUrl;
   if (body.platform !== undefined) next.platform = body.platform;
@@ -156,6 +158,7 @@ function parseBool(value, defaultValue = false) {
 
 export const seedCampaign = {
   id: 'cmp_demo',
+  userId: 'usr_louzada',
   name: 'Campanha Demo',
   slug: 'demo',
   primaryUrl: 'https://example.com/real-offer',
