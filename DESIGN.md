@@ -2,37 +2,54 @@
 
 ## Theme
 
-Dark operational console. Restrained: tinted neutrals + cyan/blue accent for active/primary only.
+Dark operational console for night-desk traffic operators.  
+**Color strategy: Restrained** — cool slate neutrals + one blue accent ≤10%.
 
-## Colors (CSS variables)
+Physical scene: operator at a dim desk, secondary monitor, scanning metrics and lists — trust Linear/Stripe density, not neon cyberpunk.
 
-| Token | Role |
-|-------|------|
-| `--bg` | App background |
-| `--sidebar` | Nav surface |
-| `--panel` | Cards / panels |
-| `--field` | Inputs |
-| `--text` | Primary text |
-| `--muted` | Secondary text (≥ readable on dark) |
-| `--cyan` / `--blue` | Accent / active |
-| `--green` / `--red` / `--amber` | Semantic |
+## Colors
+
+| Token | Value | Role |
+|-------|--------|------|
+| `--bg` | `#0a0c10` | Canvas |
+| `--sidebar` | `#0c0f14` | Nav rail |
+| `--panel` | `#12161d` | Surfaces |
+| `--field` | `#0f1319` | Inputs |
+| `--border` | `#242a35` | Structure |
+| `--text` | `#eef1f6` | Primary copy |
+| `--muted` | `#a8b0bd` | Secondary (readable) |
+| `--accent` | `#3d9cfd` | Primary actions / active |
+| Semantic | green / red / amber | Status only |
+
+No gradient text. No cyan glow stacks. Active nav = soft accent fill + thin border.
 
 ## Typography
 
-Single stack: system Inter/ui-sans. Scale fixed rem; no display fonts in UI.
+- Family: **IBM Plex Sans** (single family, product register)
+- H1 ~1.5rem / 600 / -0.02em
+- Body 14px, labels 12–13px
+- Numbers: tabular-nums on metrics
 
 ## Layout
 
-- Desktop: sticky sidebar + content
-- Mobile: top bar + horizontal/scroll nav or collapsible drawer
-- Content max-width comfortable; panels stack on small screens
+- Sidebar 260px desktop; icon rail tablet; drawer mobile
+- Content max ~1280px, padding scale 4/8/12/16/20/24/32
+- Radius: 8px controls, 12px panels (never 32px+)
+- Elevation: **border only** on panels (no fat drop + border combo)
 
 ## Components
 
-- Nav items, panels, fields, submit buttons, status pills, lists
-- Same radius 10–14px; avoid 32px+ cards
-- One elevation language (soft shadow OR border, not both heavy)
+- Nav, panels, fields, primary/ghost buttons, metric cards, pills, tables, tutorial steps
+- Focus ring: 3px accent-soft
+- Hover: quiet surface lift, 160ms ease-out
 
 ## Motion
 
-150–220ms ease-out on hover/active; respect `prefers-reduced-motion`.
+160ms `cubic-bezier(0.22, 1, 0.36, 1)` on color/border.  
+`prefers-reduced-motion: reduce` disables transitions.
+
+## Anti-patterns (project)
+
+- WhatsApp chrome in chrome
+- Loud cyan gradients on every CTA
+- Hero-metric SaaS template with huge numbers + glow
