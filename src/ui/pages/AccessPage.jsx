@@ -7,7 +7,7 @@ import {
   Filter,
   Globe2,
   ListFilter,
-  Map,
+  Map as MapIcon,
   Monitor,
   RefreshCw,
   ToggleRight,
@@ -39,7 +39,8 @@ function countryFlag(code) {
 }
 
 function LocationMap({ pins, total, mapMode, zoom, setZoom }) {
-  const maxCount = Math.max(1, ...pins.map((p) => p.count || 1));
+  const safePins = Array.isArray(pins) ? pins : [];
+  const maxCount = Math.max(1, ...safePins.map((p) => p.count || 1), 1);
 
   return (
     <div className={`map-card ${mapMode === 'Globo 3D' ? 'globe' : ''}`}>
@@ -73,7 +74,7 @@ function LocationMap({ pins, total, mapMode, zoom, setZoom }) {
             <path d="M690 145l74-48 75 24 2 58-64 47-76-18z" />
             <path d="M730 292l58 10 34 44-43 26-58-18z" />
           </g>
-          {pins.map((pin) => {
+          {safePins.map((pin) => {
             const { x, y } = project(pin.lat, pin.lng);
             if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
             const r = 6 + (pin.count / maxCount) * 14;
@@ -287,7 +288,7 @@ export function AccessPage({ events, stats, refreshData }) {
             <h2>Localizacao dos Acessos</h2>
             <div className="segmented">
               <button className={mapMode === 'Mapa 2D' ? 'selected' : ''} onClick={() => setMapMode('Mapa 2D')} type="button">
-                <Map size={18} />
+                <MapIcon size={18} />
                 Mapa 2D
               </button>
               <button
