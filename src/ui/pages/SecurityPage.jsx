@@ -3,9 +3,13 @@ import {
   AlertTriangle,
   Ban,
   BarChart3,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   Eye,
   Globe2,
+  HelpCircle,
   ListChecks,
   Lock,
   RefreshCw,
@@ -16,6 +20,27 @@ import {
 import { useState } from 'react';
 import { MetricCard } from '../components/MetricCard.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
+
+const LIST_TIPS = {
+  'ua-blacklist': {
+    title: 'O que colocar aqui?',
+    body: 'Adicione trechos do User-Agent que voce quer bloquear. Se o visitante tiver esse texto no User-Agent, ele vai para a pagina alternativa.',
+    examples: ['curl', 'wget', 'python-requests', 'scrapy', 'headless', 'selenium', 'puppeteer', 'postman'],
+    tip: "Use trechos curtos, nao o User-Agent inteiro. Exemplo: 'curl' bloqueia curl/7.68.0 e curl/8.0.1."
+  },
+  'ip-blacklist': {
+    title: 'O que colocar aqui?',
+    body: 'Adicione IPs ou faixas de IP (CIDR) que voce quer bloquear. Eles vao para a pagina alternativa.',
+    examples: ['203.0.113.10  (IP unico)', '198.51.100.0/24  (faixa ~256 IPs)', '10.0.0.0/8  (faixa grande — use com cuidado)'],
+    tip: 'Descubra IPs suspeitos nos logs de Acessos. Comece com IPs unicos antes de usar faixas grandes.'
+  },
+  'ip-whitelist': {
+    title: 'O que colocar aqui?',
+    body: 'Adicione seu IP para sempre ver a pagina principal, mesmo se o User-Agent estiver na blacklist.',
+    examples: ['SEU.IP.ATUAL  (whatismyip.com)', 'IP.DO.ESCRITORIO', 'Ou use o Tutorial: “Adicionar meu IP a whitelist”'],
+    tip: 'Descubra seu IP em sites como whatismyip.com. Ideal para testar campanhas sem cair na alternativa.'
+  }
+};
 
 function ListManager({
   title,
@@ -31,6 +56,8 @@ function ListManager({
   const [value, setValue] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [tipsOpen, setTipsOpen] = useState(false);
+  const tips = LIST_TIPS[listKey];
 
   async function onAdd(event) {
     event.preventDefault();
@@ -54,11 +81,59 @@ function ListManager({
 
   return (
     <div className={`panel list-manager tone-${tone}`}>
-      <h2>
-        <Icon size={20} />
-        {title}
-      </h2>
-      <p>{hint}</p>
+      <div className="list-manager-head">
+        <h2>
+          <Icon size={20} />
+          {title}
+        </h2>
+        {tips && (
+          <div className="list-tips-actions">
+            <button
+              type="button"
+              className="list-tip-info"
+              title={tips.title}
+              aria-label={`Ajuda: ${title}`}
+              onClick={() => setTipsOpen((open) => !open)}
+            >
+              <HelpCircle size={18} />
+            </button>
+            <button type="button" className="list-tip-toggle" onClick={() => setTipsOpen((open) => !open)}>
+              <BookOpen size={15} />
+              Ver dicas
+              {tipsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="list-manager-hint">{hint}</p>
+
+      {tipsOpen && tips && (
+        <div className="list-tips-panel">
+          <strong>{tips.title}</strong>
+          <p>{tips.body}</p>
+          <div className="list-tips-examples">
+            <span>Exemplos:</span>
+            <ul>
+              {tips.examples.map((ex) => (
+                <li key={ex}>
+                  <code>{ex}</code>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="list-tips-note">
+            <AlertTriangle size={14} /> {tips.tip}
+          </p>
+        </div>
+      )}
+
+      {!items.length && (
+        <div className="list-empty-warn">
+          <AlertTriangle size={16} />
+          <span>Nenhum item adicionado. Adicione alguns itens para comecar a filtrar.</span>
+        </div>
+      )}
+
       <form className="block-form" onSubmit={onAdd}>
         <input value={value} onChange={(event) => setValue(event.target.value)} placeholder={placeholder} />
         <button type="submit" disabled={loading || !value.trim()}>
@@ -78,9 +153,7 @@ function ListManager({
             </div>
           ))}
         </div>
-      ) : (
-        <div className="empty-mini">Lista vazia.</div>
-      )}
+      ) : null}
     </div>
   );
 }
