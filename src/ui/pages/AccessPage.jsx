@@ -1,6 +1,5 @@
 import {
   Activity,
-  Ban,
   CheckCircle2,
   Clock3,
   Eye,
@@ -19,15 +18,7 @@ import { api } from '../api/client.js';
 import { EventRow } from '../components/EventRow.jsx';
 import { MetricCard } from '../components/MetricCard.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
-
-const MAP_W = 880;
-const MAP_H = 390;
-
-function project(lat, lng) {
-  const x = ((Number(lng) + 180) / 360) * MAP_W;
-  const y = ((90 - Number(lat)) / 180) * MAP_H;
-  return { x, y };
-}
+import { WorldMap } from '../components/WorldMap.jsx';
 
 function countryFlag(code) {
   const c = String(code || '')
@@ -36,77 +27,6 @@ function countryFlag(code) {
   if (!/^[A-Z]{2}$/.test(c)) return '🌐';
   const base = 127397;
   return String.fromCodePoint(base + c.charCodeAt(0), base + c.charCodeAt(1));
-}
-
-function LocationMap({ pins, total, mapMode, zoom, setZoom }) {
-  const safePins = Array.isArray(pins) ? pins : [];
-  const maxCount = Math.max(1, ...safePins.map((p) => p.count || 1), 1);
-
-  return (
-    <div className={`map-card ${mapMode === 'Globo 3D' ? 'globe' : ''}`}>
-      <span className="map-chip">
-        {total} localizaç{total === 1 ? 'ão' : 'ões'}
-      </span>
-      <div className="map-viewport">
-        <svg
-          viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-          aria-label="Mapa mundial de acessos"
-          className="map-svg"
-          style={{ transform: `scale(${zoom})` }}
-        >
-          <defs>
-            <pattern id="mapGrid" width="28" height="28" patternUnits="userSpaceOnUse">
-              <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-            </pattern>
-            <radialGradient id="pinGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="rgba(61,156,253,0.55)" />
-              <stop offset="100%" stopColor="rgba(61,156,253,0)" />
-            </radialGradient>
-          </defs>
-          <rect width={MAP_W} height={MAP_H} fill="url(#mapGrid)" />
-          {/* Silhuetas simplificadas (contexto visual) */}
-          <g className="map-land" fill="rgba(148,163,184,0.12)" stroke="rgba(148,163,184,0.18)" strokeWidth="1">
-            <path d="M72 162 111 132l57 14 28 41-10 54-56 21-58-28-22-36z" />
-            <path d="M212 102l44-42 86 12 43 45-21 45-81 3-48-22z" />
-            <path d="M284 208l62 18 36 62-17 69-56-34-38-68z" />
-            <path d="M414 118l72-30 90 20 74 64-39 60-111-8-80-43z" />
-            <path d="M526 212l78-6 92 46 44 66-106 20-86-38z" />
-            <path d="M690 145l74-48 75 24 2 58-64 47-76-18z" />
-            <path d="M730 292l58 10 34 44-43 26-58-18z" />
-          </g>
-          {safePins.map((pin) => {
-            const { x, y } = project(pin.lat, pin.lng);
-            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-            const r = 6 + (pin.count / maxCount) * 14;
-            return (
-              <g key={`${pin.country}-${pin.lat}-${pin.lng}`} className="map-pin" transform={`translate(${x} ${y})`}>
-                <circle r={r * 2.2} fill="url(#pinGlow)" opacity="0.7" />
-                <circle r={Math.max(5, r * 0.45)} className="map-pin-dot" />
-                <title>
-                  {pin.flag || ''} {pin.country}
-                  {pin.city ? ` · ${pin.city}` : ''} — {pin.count} acesso(s)
-                </title>
-                <text y={-r - 4} textAnchor="middle" className="map-pin-label">
-                  {pin.flag || pin.country} {pin.count}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      <div className="map-controls">
-        <button type="button" onClick={() => setZoom((current) => Math.min(current + 0.15, 1.6))}>
-          +
-        </button>
-        <button type="button" onClick={() => setZoom((current) => Math.max(current - 0.15, 0.75))}>
-          -
-        </button>
-        <button type="button" onClick={() => setZoom(1)}>
-          Reset
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function aggregateFromEvents(events) {
@@ -154,11 +74,10 @@ function aggregateFromEvents(events) {
 
 export function AccessPage({ events, stats, refreshData }) {
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [timeRange, setTimeRange] = useState('30');
+  const [timeRange, setTimeRange] = useState('1440');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showReasons, setShowReasons] = useState(true);
   const [mapMode, setMapMode] = useState('Mapa 2D');
-  const [zoom, setZoom] = useState(1);
   const [locations, setLocations] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(() =>
     new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -172,7 +91,6 @@ export function AccessPage({ events, stats, refreshData }) {
 
   const localAgg = useMemo(() => aggregateFromEvents(filteredEvents), [filteredEvents]);
 
-  // Prefer API agregada; fallback para eventos ja carregados
   const topCountries = locations?.topCountries?.length
     ? locations.topCountries
     : localAgg.topCountries.map((item) => ({
@@ -267,6 +185,7 @@ export function AccessPage({ events, stats, refreshData }) {
             <option value="30">Ultimos 30 min</option>
             <option value="60">Ultima hora</option>
             <option value="1440">Hoje</option>
+            <option value="10080">7 dias</option>
           </select>
         </label>
         <label className="filter-select">
@@ -297,14 +216,18 @@ export function AccessPage({ events, stats, refreshData }) {
                 type="button"
               >
                 <Globe2 size={18} />
-                Globo 3D
+                Vista ampla
               </button>
             </div>
           </div>
-          <LocationMap pins={mapPins} total={locationTotal} mapMode={mapMode} zoom={zoom} setZoom={setZoom} />
+          <WorldMap
+            pins={mapPins}
+            total={locationTotal}
+            mode={mapMode === 'Globo 3D' ? 'globe' : '2d'}
+          />
           <p className="map-hint">
-            Pinos por pais (Cloudflare). Pais via <code>cf-ipcountry</code>. Cidade/lat/lng se os headers de geo estiverem
-            ativos na Cloudflare; senao usa centro do pais.
+            Mapa real: OpenStreetMap (grátis). Pinos: país/cidade da <strong>Cloudflare</strong> (
+            <code>cf-ipcountry</code> etc.) em cada clique em <code>/r/slug</code>.
           </p>
         </div>
         <aside className="access-side">
