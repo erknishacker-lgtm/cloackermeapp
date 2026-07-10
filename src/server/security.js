@@ -1,11 +1,16 @@
 import { config } from './config.js';
-import { isBlockActive } from './utils/ip.js';
+import { ipMatchesAny, isBlockActive, normalizeRouteLists } from './utils/ip.js';
 
+/** User-Agents tipicos de automacao, scrapers e ferramentas de request. */
 const BOT_UA_PATTERN =
-  /(bot|crawler|spider|headless|phantom|selenium|playwright|puppeteer|curl|wget|python-requests|httpclient|scrapy|postman|go-http-client|java\/|okhttp|axios|libwww|httpie|aiohttp|node-fetch|undici)/i;
+  /(bot|crawler|spider|headless|phantom|selenium|playwright|puppeteer|curl|wget|python-requests|httpclient|scrapy|postman|go-http-client|java\/|okhttp|axios|libwww|httpie|aiohttp|node-fetch|undici|libcurl|scrapy|http.rb|faraday|restsharp)/i;
+
 const MOBILE_UA_PATTERN = /(iphone|ipad|android|mobile|phone)/i;
 
-// Datacenter / ads-reviewer ASNs blocked globally before campaign rules.
+/**
+ * ASNs de datacenter / nuvem comumente usados por scanners e automacao.
+ * Ativo por padrao; pode desligar por campanha (blockDatacenterAsns: false).
+ */
 const BLOCKED_DATACENTER_ASNS = new Set([
   'AS32934',
   'AS15169',
@@ -83,16 +88,145 @@ function recordHit(input, state) {
   hitsByIp.set(input.ip, recent);
 }
 
+function fallbackResult({ campaign, device, country, asn, reasons, riskScore = 100 }) {
+  return {
+    decision: 'fallback',
+    riskScore,
+    reasons,
+    targetUrl: campaign.fallbackUrl,
+    device,
+    country,
+    asn
+  };
+}
+
+/** Lista custom de trechos no User-Agent (ex: "curl", "python"). */
+export function matchesBlockedUserAgent(userAgent, blockedList = []) {
+  const ua = normalizeString(userAgent).toLowerCase();
+  if (!ua || !Array.isArray(blockedList) || blockedList.length === 0) return false;
+  return blockedList.some((item) => {
+    const needle = normalizeString(item).toLowerCase();
+    return needle && ua.includes(needle);
+  });
+}
+
+/** Lista de IPs bloqueados na campanha (IP exato ou CIDR). */
+export function matchesBlockedIp(ip, blockedList = []) {
+  return ipMatchesAny(ip, blockedList);
+}
+
+/**
+ * Roteamento por listas admin (prioridade):
+ * 1) IP na whitelist  → real
+ * 2) IP na blacklist  → blocked
+ * 3) UA na blacklist  → blocked
+ * 4) demais           → real
+ *
+ * Mapeamento no cloaker:
+ * - real    = URL principal (primaryUrl)
+ * - blocked = URL alternativa (fallbackUrl)
+ */
+export function evaluateListRouting(input = {}, lists = {}) {
+  const routeLists = normalizeRouteLists(lists);
+  const ip = normalizeString(input.ip);
+  const userAgent = normalizeString(input.userAgent);
+
+  if (ip && ipMatchesAny(ip, routeLists.ipWhitelist)) {
+    return {
+      route: 'real',
+      isBlocked: false,
+      reasons: ['ip_whitelist'],
+      score: 0
+    };
+  }
+
+  if (ip && ipMatchesAny(ip, routeLists.ipBlacklist)) {
+    return {
+      route: 'blocked',
+      isBlocked: true,
+      reasons: ['ip_blacklist'],
+      score: 100
+    };
+  }
+
+  if (matchesBlockedUserAgent(userAgent, routeLists.uaBlacklist)) {
+    return {
+      route: 'blocked',
+      isBlocked: true,
+      reasons: ['ua_blacklist'],
+      score: 100
+    };
+  }
+
+  return {
+    route: 'real',
+    isBlocked: false,
+    reasons: ['default_real'],
+    score: 0
+  };
+}
+
+/**
+ * Avalia headers de browser "de verdade".
+ * Requests sem Accept HTML, Accept-Language ou client hints sobem o risco.
+ */
+export function scoreHeaders(input, { strictHeaders = false } = {}) {
+  const reasons = [];
+  let riskScore = 0;
+  const accept = normalizeString(input.accept);
+  const acceptLanguage = normalizeString(input.acceptLanguage);
+  const headers = input.headers || {};
+
+  if (!accept.includes('text/html')) {
+    riskScore += 15;
+    reasons.push('html_accept_missing');
+  }
+
+  if (!acceptLanguage) {
+    riskScore += 15;
+    reasons.push('accept_language_missing');
+  }
+
+  const missingHints =
+    !headers['sec-fetch-mode'] && !headers['sec-ch-ua'] && !headers['sec-fetch-site'];
+
+  if (missingHints) {
+    if (strictHeaders || riskScore > 0) {
+      riskScore += strictHeaders ? 25 : 10;
+      reasons.push('missing_client_hints');
+    }
+  }
+
+  // Referer ausente em conjunto com outros sinais fracos
+  if (strictHeaders && !headers.referer && !headers.referrer) {
+    riskScore += 5;
+    reasons.push('missing_referer');
+  }
+
+  return { riskScore, reasons };
+}
+
 export function detectDevice(userAgent) {
   return MOBILE_UA_PATTERN.test(normalizeString(userAgent)) ? 'mobile' : 'desktop';
 }
 
+/**
+ * Motor de filtro de trafego.
+ *
+ * Sinais:
+ * - User-Agent (bots conhecidos + lista custom da campanha)
+ * - IP (bloqueio global + lista da campanha)
+ * - Headers (Accept, Accept-Language, Sec-Fetch / client hints)
+ * - Pais, ASN, rate limit
+ *
+ * Decisao:
+ * - allow    → URL principal (ou destino desktop/mobile)
+ * - fallback → pagina alternativa (URL secundária)
+ */
 export function evaluateRequest(input, campaign, state = {}) {
   const protection = campaign.protection || {};
   const enabled = protection.enabled !== false;
   const userAgent = normalizeString(input.userAgent);
-  const accept = normalizeString(input.accept);
-  const acceptLanguage = normalizeString(input.acceptLanguage);
   const country = normalizeString(input.country).toUpperCase();
   const asn = normalizeString(input.asn).toUpperCase();
   const reasons = [];
@@ -100,35 +234,104 @@ export function evaluateRequest(input, campaign, state = {}) {
 
   const device = detectDevice(userAgent);
   const now = input.now || Date.now();
+  const blockDatacenter = protection.blockDatacenterAsns !== false;
+  const strictHeaders = protection.strictHeaders === true;
 
+  // 0) Listas admin: whitelist IP → real; blacklist IP/UA → blocked
+  //    real = primaryUrl | blocked = fallbackUrl
+  const listDecision = evaluateListRouting(input, state?.routeLists);
+  if (listDecision.route === 'blocked') {
+    recordHit(input, state);
+    return fallbackResult({
+      campaign,
+      device,
+      country,
+      asn,
+      reasons: listDecision.reasons,
+      riskScore: listDecision.score
+    });
+  }
+  if (listDecision.reasons.includes('ip_whitelist')) {
+    recordHit(input, state);
+    return {
+      decision: 'allow',
+      riskScore: 0,
+      reasons: ['ip_whitelist'],
+      targetUrl: getTargetUrl(campaign, device),
+      device,
+      country,
+      asn
+    };
+  }
+
+  // 1) IP bloqueado globalmente (mapa legado do painel — IP exato / com expiracao)
   const blockedEntry = state?.blockedIps?.get(input.ip);
   if (blockedEntry && isBlockActive(blockedEntry, now)) {
     recordHit(input, state);
-    return {
-      decision: 'fallback',
-      riskScore: 100,
-      reasons: ['manual_ip_block'],
-      targetUrl: campaign.fallbackUrl,
+    return fallbackResult({
+      campaign,
       device,
       country,
-      asn
-    };
+      asn,
+      reasons: ['manual_ip_block']
+    });
   }
 
-  if (asn && isDatacenterAsn(asn)) {
+  // 1b) IPs do mapa legado tambem aceitam chave CIDR
+  if (state?.blockedIps?.size) {
+    const cidrKeys = [...state.blockedIps.keys()].filter((key) => String(key).includes('/'));
+    for (const key of cidrKeys) {
+      const item = state.blockedIps.get(key);
+      if (item && isBlockActive(item, now) && ipMatchesAny(input.ip, [key])) {
+        recordHit(input, state);
+        return fallbackResult({
+          campaign,
+          device,
+          country,
+          asn,
+          reasons: ['manual_ip_block']
+        });
+      }
+    }
+  }
+
+  // 2) IP bloqueado na campanha (IP ou CIDR)
+  if (matchesBlockedIp(input.ip, protection.blockedIps)) {
     recordHit(input, state);
-    return {
-      decision: 'fallback',
-      riskScore: 100,
-      reasons: ['datacenter_asn'],
-      targetUrl: campaign.fallbackUrl,
+    return fallbackResult({
+      campaign,
       device,
       country,
-      asn
-    };
+      asn,
+      reasons: ['campaign_ip_block']
+    });
   }
 
-  // Logs-only mode: score for analytics but always allow destination routing.
+  // 3) User-Agent custom bloqueado na campanha (match imediato)
+  if (matchesBlockedUserAgent(userAgent, protection.blockedUserAgents)) {
+    recordHit(input, state);
+    return fallbackResult({
+      campaign,
+      device,
+      country,
+      asn,
+      reasons: ['campaign_user_agent_block']
+    });
+  }
+
+  // 4) ASN de datacenter (opcional por campanha)
+  if (blockDatacenter && asn && isDatacenterAsn(asn)) {
+    recordHit(input, state);
+    return fallbackResult({
+      campaign,
+      device,
+      country,
+      asn,
+      reasons: ['datacenter_asn']
+    });
+  }
+
+  // Modo so logs: calcula score mas nao desvia
   if (campaign.mode === 'Somente logs' || !enabled) {
     recordHit(input, state);
     if (!userAgent) reasons.push('missing_user_agent');
@@ -136,6 +339,9 @@ export function evaluateRequest(input, campaign, state = {}) {
       riskScore += 70;
       reasons.push('known_automation_user_agent');
     }
+    const headerScore = scoreHeaders(input, { strictHeaders });
+    riskScore += headerScore.riskScore;
+    reasons.push(...headerScore.reasons);
     reasons.push(campaign.mode === 'Somente logs' ? 'logs_only_mode' : 'protection_disabled');
     return {
       decision: 'allow',
@@ -148,6 +354,7 @@ export function evaluateRequest(input, campaign, state = {}) {
     };
   }
 
+  // 5) User-Agent ausente ou de automacao
   if (!userAgent) {
     riskScore += 40;
     reasons.push('missing_user_agent');
@@ -156,28 +363,12 @@ export function evaluateRequest(input, campaign, state = {}) {
     reasons.push('known_automation_user_agent');
   }
 
-  if (!accept.includes('text/html')) {
-    riskScore += 15;
-    reasons.push('html_accept_missing');
-  }
+  // 6) Headers de browser
+  const headerScore = scoreHeaders(input, { strictHeaders });
+  riskScore += headerScore.riskScore;
+  reasons.push(...headerScore.reasons);
 
-  if (!acceptLanguage) {
-    riskScore += 15;
-    reasons.push('accept_language_missing');
-  }
-
-  // Extra signal only when request already looks incomplete.
-  const headers = input.headers || {};
-  if (
-    riskScore > 0 &&
-    !headers['sec-fetch-mode'] &&
-    !headers['sec-ch-ua'] &&
-    !headers['sec-fetch-site']
-  ) {
-    riskScore += 10;
-    reasons.push('missing_client_hints');
-  }
-
+  // 7) Pais / ASN da campanha
   if (country && (protection.blockedCountries || []).map((item) => item.toUpperCase()).includes(country)) {
     riskScore += 60;
     reasons.push('blocked_country');
@@ -188,6 +379,7 @@ export function evaluateRequest(input, campaign, state = {}) {
     reasons.push('blocked_asn');
   }
 
+  // 8) Rate limit por IP
   const recentHits = getRecentHits(input, state);
   const limit = Number(protection.rateLimitPerMinute || config.defaults.rateLimitPerMinute);
   if (recentHits.length >= limit) {
@@ -216,8 +408,7 @@ export function evaluateRequest(input, campaign, state = {}) {
 }
 
 /**
- * Record a fallback violation and optionally auto-block the IP.
- * Returns a blocked entry when a new ban is applied, otherwise null.
+ * Registra violacao (fallback) e opcionalmente auto-bloqueia o IP.
  */
 export function trackViolation(ip, state, options = {}) {
   if (!ip || !state?.violationsByIp) return null;

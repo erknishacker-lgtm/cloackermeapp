@@ -21,7 +21,11 @@ export const initialForm = {
   rateLimitPerMinute: 20,
   fallbackThreshold: 45,
   blockedCountries: '',
-  blockedAsns: ''
+  blockedAsns: '',
+  blockedUserAgents: '',
+  blockedIps: '',
+  blockDatacenterAsns: true,
+  strictHeaders: false
 };
 
 export const navItems = [

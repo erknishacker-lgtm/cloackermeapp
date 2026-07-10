@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 import { seedCampaign } from '../utils/campaign.js';
-import { isBlockActive } from '../utils/ip.js';
+import { emptyRouteLists, isBlockActive, normalizeRouteLists } from '../utils/ip.js';
 import { createOwnerUser, ensureOwnerUser } from '../utils/users.js';
 
 function emptyState(seedDemo = false) {
@@ -12,6 +12,7 @@ function emptyState(seedDemo = false) {
     hitsByIp: {},
     blockedIps: {},
     violationsByIp: {},
+    routeLists: emptyRouteLists(),
     globalDomains: [
       {
         id: 'dom_global_go',
@@ -51,6 +52,7 @@ function hydrateMaps(raw) {
     customDomains: raw.customDomains || [],
     users,
     notifications: raw.notifications || [],
+    routeLists: normalizeRouteLists(raw.routeLists || base.routeLists),
     settings: { ...base.settings, ...(raw.settings || {}) }
   };
   return state;
@@ -64,6 +66,7 @@ function serializeState(store) {
     blockedIps: Object.fromEntries(store.blockedIps),
     violationsByIp: Object.fromEntries(store.violationsByIp),
     sessions: Object.fromEntries(store.sessions),
+    routeLists: normalizeRouteLists(store.routeLists),
     globalDomains: store.globalDomains,
     customDomains: store.customDomains,
     users: store.users,
@@ -180,6 +183,13 @@ export function createStore(options = {}) {
     },
     set settings(value) {
       state.settings = value;
+      schedulePersist();
+    },
+    get routeLists() {
+      return state.routeLists;
+    },
+    set routeLists(value) {
+      state.routeLists = normalizeRouteLists(value);
       schedulePersist();
     },
     touch() {

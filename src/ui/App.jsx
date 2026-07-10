@@ -83,9 +83,9 @@ export default function App() {
   if (!authChecked) {
     return (
       <div className="login-shell">
-        <div className="panel login-card">
+        <div className="panel login-card login-brand">
           <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo large" />
-          <p>Carregando Cloaker.lol...</p>
+          <p className="login-subtitle">Carregando...</p>
         </div>
       </div>
     );
@@ -124,6 +124,9 @@ export default function App() {
         blockedIps={data.blockedIps}
         createBlockedIp={data.createBlockedIp}
         deleteBlockedIp={data.deleteBlockedIp}
+        routeLists={data.routeLists}
+        addRouteListEntry={data.addRouteListEntry}
+        removeRouteListEntry={data.removeRouteListEntry}
         refreshData={data.refreshData}
         stats={data.stats}
       />

@@ -104,6 +104,12 @@ export const api = {
     request('/api/blocked-ips', { method: 'POST', body: JSON.stringify({ ip, reason }) }),
   deleteBlockedIp: (ip) => request(`/api/blocked-ips/${encodeURIComponent(ip)}`, { method: 'DELETE' }),
 
+  getRouteLists: () => request('/api/route-lists'),
+  addRouteListEntry: (list, value) =>
+    request(`/api/route-lists/${list}`, { method: 'POST', body: JSON.stringify({ value }) }),
+  removeRouteListEntry: (list, value) =>
+    request(`/api/route-lists/${list}?value=${encodeURIComponent(value)}`, { method: 'DELETE' }),
+
   getSettings: () => request('/api/settings'),
   updateSettings: (body) => request('/api/settings', { method: 'PATCH', body: JSON.stringify(body) }),
 

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isValidIp, serializeBlockedIp } from '../utils/ip.js';
+import { isValidIpOrCidr, serializeBlockedIp } from '../utils/ip.js';
 
 export function createBlockedIpsRouter(store) {
   const router = Router();
@@ -15,8 +15,8 @@ export function createBlockedIpsRouter(store) {
     if (!ip) {
       return res.status(400).json({ errors: ['ip_required'] });
     }
-    if (!isValidIp(ip)) {
-      return res.status(400).json({ errors: ['ip_invalid'] });
+    if (!isValidIpOrCidr(ip)) {
+      return res.status(400).json({ errors: ['ip_invalid'], message: 'Use IP (1.2.3.4) ou CIDR (1.2.3.0/24).' });
     }
 
     const item = {

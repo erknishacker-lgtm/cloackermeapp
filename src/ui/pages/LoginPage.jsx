@@ -44,11 +44,8 @@ export function LoginPage({ onLoggedIn }) {
     <div className="login-shell">
       <form className="panel login-card" onSubmit={submit}>
         <div className="login-brand">
-          <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo" />
-          <div>
-            <h1>Cloaker.lol</h1>
-            <p>{mode === 'login' ? 'Entre no painel' : 'Crie sua conta'}</p>
-          </div>
+          <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo large" />
+          <p className="login-subtitle">{mode === 'login' ? 'Entre no painel' : 'Crie sua conta'}</p>
         </div>
 
         <div className="auth-tabs">

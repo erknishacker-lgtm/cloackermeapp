@@ -34,7 +34,14 @@ export function toCampaign(body = {}) {
         body.fallbackThreshold ?? body.protection?.fallbackThreshold ?? defaultThreshold
       ),
       blockedCountries: parseList(body.blockedCountries ?? body.protection?.blockedCountries, true),
-      blockedAsns: parseList(body.blockedAsns ?? body.protection?.blockedAsns, true)
+      blockedAsns: parseList(body.blockedAsns ?? body.protection?.blockedAsns, true),
+      blockedUserAgents: parseList(body.blockedUserAgents ?? body.protection?.blockedUserAgents, false),
+      blockedIps: parseList(body.blockedIps ?? body.protection?.blockedIps, false),
+      blockDatacenterAsns: parseBool(
+        body.blockDatacenterAsns ?? body.protection?.blockDatacenterAsns,
+        true
+      ),
+      strictHeaders: parseBool(body.strictHeaders ?? body.protection?.strictHeaders, false)
     }
   };
 }
@@ -64,6 +71,14 @@ export function applyCampaignPatch(campaign, body = {}) {
   if (body.fallbackThreshold !== undefined) protection.fallbackThreshold = Number(body.fallbackThreshold);
   if (body.blockedCountries !== undefined) protection.blockedCountries = parseList(body.blockedCountries, true);
   if (body.blockedAsns !== undefined) protection.blockedAsns = parseList(body.blockedAsns, true);
+  if (body.blockedUserAgents !== undefined) {
+    protection.blockedUserAgents = parseList(body.blockedUserAgents, false);
+  }
+  if (body.blockedIps !== undefined) protection.blockedIps = parseList(body.blockedIps, false);
+  if (body.blockDatacenterAsns !== undefined) {
+    protection.blockDatacenterAsns = parseBool(body.blockDatacenterAsns, true);
+  }
+  if (body.strictHeaders !== undefined) protection.strictHeaders = parseBool(body.strictHeaders, false);
   if (body.protection) {
     Object.assign(protection, body.protection);
     if (body.protection.blockedCountries) {
@@ -71,6 +86,18 @@ export function applyCampaignPatch(campaign, body = {}) {
     }
     if (body.protection.blockedAsns) {
       protection.blockedAsns = parseList(body.protection.blockedAsns, true);
+    }
+    if (body.protection.blockedUserAgents) {
+      protection.blockedUserAgents = parseList(body.protection.blockedUserAgents, false);
+    }
+    if (body.protection.blockedIps) {
+      protection.blockedIps = parseList(body.protection.blockedIps, false);
+    }
+    if (body.protection.blockDatacenterAsns !== undefined) {
+      protection.blockDatacenterAsns = parseBool(body.protection.blockDatacenterAsns, true);
+    }
+    if (body.protection.strictHeaders !== undefined) {
+      protection.strictHeaders = parseBool(body.protection.strictHeaders, false);
     }
   }
   next.protection = protection;
@@ -111,10 +138,20 @@ function parseList(value, upper = false) {
   }
 
   return String(value || '')
-    .split(',')
+    .split(/[\n,]+/)
     .map((item) => item.trim())
     .filter(Boolean)
     .map((item) => (upper ? item.toUpperCase() : item));
+}
+
+function parseBool(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on', 'sim'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off', 'nao', 'não'].includes(normalized)) return false;
+  return defaultValue;
 }
 
 export const seedCampaign = {
@@ -138,6 +175,10 @@ export const seedCampaign = {
     rateLimitPerMinute: 20,
     fallbackThreshold: 45,
     blockedCountries: [],
-    blockedAsns: []
+    blockedAsns: [],
+    blockedUserAgents: [],
+    blockedIps: [],
+    blockDatacenterAsns: true,
+    strictHeaders: false
   }
 };

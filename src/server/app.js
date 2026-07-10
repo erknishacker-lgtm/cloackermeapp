@@ -11,6 +11,7 @@ import { createDomainsRouter } from './routes/domains.js';
 import { createEventsRouter } from './routes/events.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import { createRedirectRouter } from './routes/redirect.js';
+import { createRouteListsRouter } from './routes/routeLists.js';
 import { createSettingsRouter } from './routes/settings.js';
 import { createStatsRouter } from './routes/stats.js';
 import { createStore } from './store/createStore.js';
@@ -49,6 +50,7 @@ export function createApp(options = {}) {
   app.use('/api/stats', requireAuth, createStatsRouter(store));
   app.use('/api/domains', requireAuth, createDomainsRouter(store));
   app.use('/api/blocked-ips', requireAuth, createBlockedIpsRouter(store));
+  app.use('/api/route-lists', requireAuth, createRouteListsRouter(store));
   app.use('/api/settings', requireAuth, createSettingsRouter(store));
   app.use('/api/notifications', requireAuth, createNotificationsRouter(store));
   app.use('/r', createRedirectRouter(store));

@@ -109,19 +109,90 @@ describe('evaluateRequest', () => {
     expect(result.reasons).toContain('manual_ip_block');
   });
 
-  test('globally blocks datacenter/reviewer ASNs even without campaign config', () => {
+  test('blocks datacenter ASNs by default even without campaign config', () => {
     const minimalCampaign = {
       primaryUrl: 'https://example.com/real',
       fallbackUrl: 'https://example.com/safe',
       protection: { enabled: true }
     };
 
-    const metaReviewer = evaluateRequest(request({ asn: 'AS32934' }), minimalCampaign, {
+    const cloudVisitor = evaluateRequest(request({ asn: 'AS16509' }), minimalCampaign, {
       hitsByIp: new Map()
     });
-    expect(metaReviewer.decision).toBe('fallback');
-    expect(metaReviewer.targetUrl).toBe('https://example.com/safe');
-    expect(metaReviewer.reasons).toContain('datacenter_asn');
+    expect(cloudVisitor.decision).toBe('fallback');
+    expect(cloudVisitor.targetUrl).toBe('https://example.com/safe');
+    expect(cloudVisitor.reasons).toContain('datacenter_asn');
+  });
+
+  test('allows disabling datacenter ASN block per campaign', () => {
+    const result = evaluateRequest(
+      request({ asn: 'AS16509' }),
+      {
+        ...campaign,
+        protection: { ...campaign.protection, blockDatacenterAsns: false }
+      },
+      { hitsByIp: new Map() }
+    );
+    expect(result.decision).toBe('allow');
+  });
+
+  test('sends campaign-blocked user-agent patterns to alternative page', () => {
+    const result = evaluateRequest(
+      request({
+        userAgent: 'MyCustomScraper/1.0'
+      }),
+      {
+        ...campaign,
+        protection: {
+          ...campaign.protection,
+          blockedUserAgents: ['mycustomscraper']
+        }
+      },
+      { hitsByIp: new Map() }
+    );
+
+    expect(result.decision).toBe('fallback');
+    expect(result.targetUrl).toBe('https://example.com/safe');
+    expect(result.reasons).toContain('campaign_user_agent_block');
+  });
+
+  test('sends campaign-blocked IPs to alternative page', () => {
+    const result = evaluateRequest(
+      request({ ip: '203.0.113.99' }),
+      {
+        ...campaign,
+        protection: {
+          ...campaign.protection,
+          blockedIps: ['203.0.113.99']
+        }
+      },
+      { hitsByIp: new Map() }
+    );
+
+    expect(result.decision).toBe('fallback');
+    expect(result.reasons).toContain('campaign_ip_block');
+  });
+
+  test('strict headers increase risk when client hints are missing', () => {
+    const result = evaluateRequest(
+      request({
+        headers: {},
+        accept: 'text/html',
+        acceptLanguage: 'pt-BR'
+      }),
+      {
+        ...campaign,
+        protection: {
+          ...campaign.protection,
+          strictHeaders: true,
+          fallbackThreshold: 20
+        }
+      },
+      { hitsByIp: new Map() }
+    );
+
+    expect(result.reasons).toContain('missing_client_hints');
+    expect(result.decision).toBe('fallback');
   });
 
   test('still lets residential ISP users through the global block', () => {

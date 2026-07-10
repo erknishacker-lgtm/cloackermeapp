@@ -27,6 +27,11 @@ export function useDashboardData({ enabled = true } = {}) {
   const [events, setEvents] = useState([]);
   const [domains, setDomains] = useState({ global: [], custom: [] });
   const [blockedIps, setBlockedIps] = useState([]);
+  const [routeLists, setRouteLists] = useState({
+    uaBlacklist: [],
+    ipBlacklist: [],
+    ipWhitelist: []
+  });
   const [settings, setSettings] = useState({
     allowSimulate: true,
     autoBlockEnabled: true,
@@ -42,13 +47,14 @@ export function useDashboardData({ enabled = true } = {}) {
   const refreshData = useCallback(async () => {
     if (!enabled) return;
     try {
-      const [campaignsRes, eventsRes, statsRes, domainsRes, blockedRes, settingsRes] = await Promise.all([
+      const [campaignsRes, eventsRes, statsRes, domainsRes, blockedRes, settingsRes, listsRes] = await Promise.all([
         api.getCampaigns(),
         api.getEvents({ limit: 100 }),
         api.getStats(),
         api.getDomains(),
         api.getBlockedIps(),
-        api.getSettings()
+        api.getSettings(),
+        api.getRouteLists()
       ]);
 
       if (campaignsRes.status === 401) {
@@ -62,6 +68,13 @@ export function useDashboardData({ enabled = true } = {}) {
       setStats({ ...emptyStats, ...(statsRes.payload || {}) });
       setDomains(domainsRes.payload || { global: [], custom: [] });
       setBlockedIps(blockedRes.payload || []);
+      if (listsRes.ok && listsRes.payload) {
+        setRouteLists({
+          uaBlacklist: listsRes.payload.uaBlacklist || [],
+          ipBlacklist: listsRes.payload.ipBlacklist || [],
+          ipWhitelist: listsRes.payload.ipWhitelist || []
+        });
+      }
       if (settingsRes.ok && settingsRes.payload) setSettings(settingsRes.payload);
       setError('');
     } catch {
@@ -175,6 +188,40 @@ export function useDashboardData({ enabled = true } = {}) {
     }
   }
 
+  async function addRouteListEntry(list, value) {
+    try {
+      const { response, payload } = await api.addRouteListEntry(list, value);
+      if (!response.ok) {
+        return { ok: false, message: payload?.message || payload?.errors?.join(', ') || 'Erro ao adicionar.' };
+      }
+      setRouteLists({
+        uaBlacklist: payload.uaBlacklist || [],
+        ipBlacklist: payload.ipBlacklist || [],
+        ipWhitelist: payload.ipWhitelist || []
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'Falha ao conectar no backend.' };
+    }
+  }
+
+  async function removeRouteListEntry(list, value) {
+    try {
+      const { response, payload } = await api.removeRouteListEntry(list, value);
+      if (!response.ok) {
+        return { ok: false, message: payload?.message || 'Erro ao remover.' };
+      }
+      setRouteLists({
+        uaBlacklist: payload.uaBlacklist || [],
+        ipBlacklist: payload.ipBlacklist || [],
+        ipWhitelist: payload.ipWhitelist || []
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'Falha ao conectar no backend.' };
+    }
+  }
+
   async function saveSettings(body) {
     try {
       const { response, payload } = await api.updateSettings(body);
@@ -201,6 +248,9 @@ export function useDashboardData({ enabled = true } = {}) {
     blockedIps,
     createBlockedIp,
     deleteBlockedIp,
+    routeLists,
+    addRouteListEntry,
+    removeRouteListEntry,
     settings,
     saveSettings,
     stats,

@@ -6,7 +6,6 @@ export function Sidebar({ activePage, setActivePage, settings, user, onLogout })
     <aside className="sidebar">
       <div className="brand">
         <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo" />
-        <strong>Cloaker.lol</strong>
       </div>
 
       <nav className="nav">
