@@ -111,9 +111,13 @@ export default function App() {
   if (!authChecked) {
     return (
       <div className="login-shell">
-        <div className="panel login-card login-brand">
-          <img src="/logo.png" alt="Cloaker.lol" className="brand-logo large" />
-          <p className="login-subtitle">Carregando...</p>
+        <div className="login-stack">
+          <div className="login-brand">
+            <img src="/logo.png?v=2" alt="Cloaker.lol" className="brand-logo large" />
+          </div>
+          <div className="panel login-card">
+            <p className="login-subtitle">Carregando...</p>
+          </div>
         </div>
       </div>
     );

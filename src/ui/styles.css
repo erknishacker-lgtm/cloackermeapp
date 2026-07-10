@@ -1874,12 +1874,25 @@ a.support {
     var(--bg);
 }
 
-.login-card {
+.login-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
   width: min(400px, 100%);
-  padding: 36px 28px 28px;
+}
+
+.login-card {
+  width: 100%;
+  padding: 28px 28px 24px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(18, 22, 30, 0.98), var(--panel));
+}
+
+.login-card .login-subtitle {
+  margin: 0 0 18px;
+  text-align: center;
 }
 
 .login-brand {
@@ -1887,10 +1900,13 @@ a.support {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  margin-bottom: 28px;
+  gap: 0;
+  margin: 0;
+  padding: 0;
   text-align: center;
   background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .login-brand h1 {
