@@ -35,7 +35,7 @@ export function LoginPage({ onLoggedIn }) {
     <div className="login-shell">
       <form className="panel login-card" onSubmit={submit}>
         <div className="login-brand">
-          <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo large" />
+          <img src="/logo.png" alt="Cloaker.lol" className="brand-logo large" />
           <p className="login-subtitle">Entre no painel</p>
         </div>
 

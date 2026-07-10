@@ -1,27 +1,28 @@
 :root {
   color-scheme: dark;
-  /* Operational console — cool slate + restrained teal accent */
-  --bg: #0a0c10;
-  --bg-elevated: #0e1116;
-  --sidebar: #0c0f14;
-  --panel: #12161d;
-  --panel-2: #161b24;
-  --field: #0f1319;
-  --border: #242a35;
-  --border-soft: #1b2029;
-  --text: #eef1f6;
-  --muted: #a8b0bd;
-  --muted-2: #8b93a3;
-  --accent: #3d9cfd;
-  --accent-soft: rgba(61, 156, 253, 0.12);
-  --accent-border: rgba(61, 156, 253, 0.35);
-  --cyan: #3d9cfd;
+  /* Premium ops console — deep ink + single blue accent */
+  --bg: #07090d;
+  --bg-elevated: #0c0f14;
+  --sidebar: #090b10;
+  --panel: #0f131a;
+  --panel-2: #141922;
+  --field: #0b0e14;
+  --border: #222833;
+  --border-soft: #181c25;
+  --text: #f0f3f8;
+  --muted: #a7b0be;
+  --muted-2: #8a93a3;
+  --accent: #4aa3ff;
+  --accent-hover: #6bb4ff;
+  --accent-soft: rgba(74, 163, 255, 0.12);
+  --accent-border: rgba(74, 163, 255, 0.32);
+  --cyan: #4aa3ff;
   --blue: #5b8def;
   --green: #3ecf8e;
   --red: #f07178;
   --amber: #e6b450;
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-sm: 10px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -73,8 +74,8 @@ button {
   display: flex;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 100% -20%, rgba(61, 156, 253, 0.07), transparent 50%),
-    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(62, 207, 142, 0.03), transparent 45%),
+    radial-gradient(ellipse 70% 45% at 85% -15%, rgba(74, 163, 255, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 10% 110%, rgba(62, 207, 142, 0.035), transparent 50%),
     var(--bg);
 }
 
@@ -83,10 +84,10 @@ button {
   top: 0;
   display: flex;
   flex-direction: column;
-  width: 260px;
+  width: 268px;
   height: 100vh;
   border-right: 1px solid var(--border-soft);
-  background: var(--sidebar);
+  background: linear-gradient(180deg, #0a0c12 0%, var(--sidebar) 40%, #080a0e 100%);
   flex-shrink: 0;
 }
 
@@ -96,9 +97,10 @@ button {
   justify-content: center;
   gap: 0;
   height: auto;
-  min-height: 200px;
+  min-height: 220px;
   padding: var(--space-6) var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid transparent;
+  background: transparent;
 }
 
 .brand strong {
@@ -130,32 +132,31 @@ button {
   gap: 12px;
   width: 100%;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
   color: var(--muted);
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   text-align: left;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
 
 .nav-item svg {
   flex: 0 0 auto;
-  opacity: 0.85;
+  opacity: 0.8;
 }
 
 .nav-item:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .nav-item.active {
   color: var(--text);
   background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
-  box-shadow: none;
+  border-color: var(--accent-border);
 }
 
 .nav-item.active svg {
@@ -218,7 +219,7 @@ button {
 }
 
 .content {
-  width: min(1280px, calc(100vw - 260px));
+  width: min(1280px, calc(100vw - 268px));
   max-width: 100%;
   padding: var(--space-6) var(--space-6) 48px;
   margin: 0 auto;
@@ -355,7 +356,7 @@ h2 {
 .panel {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--panel);
+  background: linear-gradient(165deg, rgba(20, 25, 34, 0.96), var(--panel) 42%);
 }
 
 .campaign-form {
@@ -552,7 +553,7 @@ select {
 }
 
 .submit-button:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: var(--accent-hover);
 }
 
 .submit-button:disabled {
@@ -753,14 +754,19 @@ td span {
 
 .metric-card {
   display: flex;
-  min-height: 112px;
+  min-height: 108px;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 18px 20px;
+  padding: 18px 18px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
+  transition: border-color 160ms var(--ease);
+}
+
+.metric-card:hover {
+  border-color: #2c3442;
 }
 
 .metric-card.large {
@@ -1862,18 +1868,18 @@ a.support {
   display: grid;
   min-height: 100vh;
   place-items: center;
-  padding: 24px;
+  padding: 28px 20px;
   background:
-    radial-gradient(ellipse 70% 45% at 50% -10%, rgba(61, 156, 253, 0.1), transparent 55%),
+    radial-gradient(ellipse 65% 40% at 50% 0%, rgba(74, 163, 255, 0.1), transparent 55%),
     var(--bg);
 }
 
 .login-card {
   width: min(400px, 100%);
-  padding: 32px 28px;
+  padding: 36px 28px 28px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: linear-gradient(180deg, rgba(18, 22, 30, 0.98), var(--panel));
 }
 
 .login-brand {
@@ -1881,9 +1887,10 @@ a.support {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 28px;
   text-align: center;
+  background: transparent;
 }
 
 .login-brand h1 {
@@ -1906,29 +1913,31 @@ a.support {
   line-height: 1.4;
 }
 
+/* Logo solto: sem caixa, borda ou fundo — PNG transparente */
 .brand-logo {
-  width: 220px;
-  height: 220px;
-  max-width: 88%;
-  object-fit: cover;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  width: 200px;
+  height: auto;
+  max-width: 90%;
+  object-fit: contain;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: block;
 }
 
 .brand-logo.large {
-  width: min(280px, 72vw);
-  height: min(280px, 72vw);
+  width: min(260px, 70vw);
+  height: auto;
   margin: 0 auto;
   display: block;
-  border-radius: 24px;
 }
 
 .brand .brand-logo {
   flex: 0 0 auto;
-  width: 200px;
-  height: 200px;
+  width: 188px;
+  height: auto;
   max-width: 100%;
-  border-radius: 18px;
 }
 
 .auth-tabs {
@@ -2288,8 +2297,8 @@ a.support {
   }
 
   .brand .brand-logo {
-    width: 88px;
-    height: 88px;
+    width: 96px;
+    height: auto;
   }
 
   .nav-item {
@@ -2358,11 +2367,13 @@ a.support {
   }
 
   .mobile-logo {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     margin: 0 auto;
-    border-radius: 10px;
-    object-fit: cover;
+    border-radius: 0;
+    object-fit: contain;
+    background: transparent;
+    border: 0;
   }
 
   .mobile-user {
@@ -2405,8 +2416,8 @@ a.support {
   }
 
   .brand .brand-logo {
-    width: 120px;
-    height: 120px;
+    width: 140px;
+    height: auto;
   }
 
   .map-leaflet-host {

@@ -49,7 +49,7 @@ export function Sidebar({ activePage, setActivePage, user, onLogout }) {
         >
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
-        <img src="/logo.jpg" alt="Cloaker.lol" className="mobile-logo" />
+        <img src="/logo.png" alt="Cloaker.lol" className="mobile-logo" />
         <div className="mobile-user" title={accountLabel()}>
           <User size={16} />
         </div>
@@ -59,7 +59,7 @@ export function Sidebar({ activePage, setActivePage, user, onLogout }) {
 
       <aside className={open ? 'sidebar open' : 'sidebar'}>
         <div className="brand">
-          <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo" />
+          <img src="/logo.png" alt="Cloaker.lol" className="brand-logo" />
         </div>
 
         <nav className="nav" aria-label="Principal">

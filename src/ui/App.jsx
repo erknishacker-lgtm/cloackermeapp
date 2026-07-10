@@ -112,7 +112,7 @@ export default function App() {
     return (
       <div className="login-shell">
         <div className="panel login-card login-brand">
-          <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo large" />
+          <img src="/logo.png" alt="Cloaker.lol" className="brand-logo large" />
           <p className="login-subtitle">Carregando...</p>
         </div>
       </div>
