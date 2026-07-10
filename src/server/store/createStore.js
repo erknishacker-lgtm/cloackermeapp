@@ -3,6 +3,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { seedCampaign } from '../utils/campaign.js';
 import { isBlockActive } from '../utils/ip.js';
+import { createOwnerUser, ensureOwnerUser } from '../utils/users.js';
 
 function emptyState(seedDemo = false) {
   return {
@@ -14,34 +15,43 @@ function emptyState(seedDemo = false) {
     globalDomains: [
       {
         id: 'dom_global_go',
-        domain: 'go.seudominio.com',
+        domain: 'cloaker.lol',
         type: 'global',
         active: true,
         createdAt: new Date().toISOString()
       }
     ],
     customDomains: [],
+    users: [createOwnerUser()],
+    sessions: {},
+    notifications: [],
     settings: {
       allowSimulate: config.allowSimulate,
       autoBlockEnabled: true,
-      operatorEmail: 'admin@mycloaker.local',
+      accessNotificationsEnabled: true,
+      operatorEmail: 'louzada@cloaker.lol',
       supportWhatsapp: ''
     }
   };
 }
 
 function hydrateMaps(raw) {
+  const base = emptyState(false);
+  const users = ensureOwnerUser(raw.users || base.users);
   const state = {
-    ...emptyState(false),
+    ...base,
     ...raw,
     hitsByIp: new Map(Object.entries(raw.hitsByIp || {})),
     blockedIps: new Map(Object.entries(raw.blockedIps || {})),
     violationsByIp: new Map(Object.entries(raw.violationsByIp || {})),
+    sessions: new Map(Object.entries(raw.sessions || {})),
     campaigns: raw.campaigns || [],
     events: raw.events || [],
-    globalDomains: raw.globalDomains || emptyState(false).globalDomains,
+    globalDomains: raw.globalDomains || base.globalDomains,
     customDomains: raw.customDomains || [],
-    settings: { ...emptyState(false).settings, ...(raw.settings || {}) }
+    users,
+    notifications: raw.notifications || [],
+    settings: { ...base.settings, ...(raw.settings || {}) }
   };
   return state;
 }
@@ -53,8 +63,11 @@ function serializeState(store) {
     hitsByIp: Object.fromEntries(store.hitsByIp),
     blockedIps: Object.fromEntries(store.blockedIps),
     violationsByIp: Object.fromEntries(store.violationsByIp),
+    sessions: Object.fromEntries(store.sessions),
     globalDomains: store.globalDomains,
     customDomains: store.customDomains,
+    users: store.users,
+    notifications: (store.notifications || []).slice(0, 200),
     settings: store.settings
   };
 }
@@ -74,6 +87,9 @@ export function createStore(options = {}) {
   } else {
     state = hydrateMaps(emptyState(options.seedDemo ?? false));
   }
+
+  // Always ensure owner exists after load
+  state.users = ensureOwnerUser(state.users);
 
   let writeTimer = null;
 
@@ -95,6 +111,11 @@ export function createStore(options = {}) {
     for (const [ip, item] of state.blockedIps.entries()) {
       if (!isBlockActive(item, now)) {
         state.blockedIps.delete(ip);
+      }
+    }
+    for (const [token, session] of state.sessions.entries()) {
+      if (session.expiresAt && new Date(session.expiresAt).getTime() <= now) {
+        state.sessions.delete(token);
       }
     }
   }
@@ -135,6 +156,23 @@ export function createStore(options = {}) {
     },
     set customDomains(value) {
       state.customDomains = value;
+      schedulePersist();
+    },
+    get users() {
+      return state.users;
+    },
+    set users(value) {
+      state.users = value;
+      schedulePersist();
+    },
+    get sessions() {
+      return state.sessions;
+    },
+    get notifications() {
+      return state.notifications;
+    },
+    set notifications(value) {
+      state.notifications = value;
       schedulePersist();
     },
     get settings() {

@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY index.html vite.config.js ./
+COPY public ./public
 COPY src ./src
 RUN npm run build
 
@@ -26,6 +27,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src/server ./src/server
+COPY public ./public
 COPY --from=build /app/dist ./dist
 
 RUN mkdir -p /app/data

@@ -38,6 +38,16 @@ export function SettingsPage({ settings, saveSettings }) {
         <label className="check-row">
           <input
             type="checkbox"
+            checked={form.accessNotificationsEnabled !== false}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, accessNotificationsEnabled: event.target.checked }))
+            }
+          />
+          <span>Notificacoes de acessos reais (sino + toasts no painel)</span>
+        </label>
+        <label className="check-row">
+          <input
+            type="checkbox"
             checked={form.allowSimulate !== false}
             onChange={(event) => setForm((current) => ({ ...current, allowSimulate: event.target.checked }))}
           />

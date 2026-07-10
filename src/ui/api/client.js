@@ -1,4 +1,5 @@
-const TOKEN_KEY = 'mycloaker_admin_token';
+const TOKEN_KEY = 'mycloaker_session_token';
+const USER_KEY = 'mycloaker_user';
 
 export function getAdminToken() {
   try {
@@ -19,6 +20,29 @@ export function setAdminToken(token) {
 
 export function clearAdminToken() {
   setAdminToken('');
+  try {
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user) {
+  try {
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 async function parse(response) {
@@ -52,6 +76,13 @@ async function request(path, options = {}) {
 
 export const api = {
   health: () => request('/health'),
+
+  login: (username, password) =>
+    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  register: (body) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  me: () => request('/api/auth/me'),
+  logout: () => request('/api/auth/logout', { method: 'POST' }),
+
   getCampaigns: () => request('/api/campaigns'),
   createCampaign: (body) => request('/api/campaigns', { method: 'POST', body: JSON.stringify(body) }),
   updateCampaign: (id, body) => request(`/api/campaigns/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -74,5 +105,9 @@ export const api = {
   deleteBlockedIp: (ip) => request(`/api/blocked-ips/${encodeURIComponent(ip)}`, { method: 'DELETE' }),
 
   getSettings: () => request('/api/settings'),
-  updateSettings: (body) => request('/api/settings', { method: 'PATCH', body: JSON.stringify(body) })
+  updateSettings: (body) => request('/api/settings', { method: 'PATCH', body: JSON.stringify(body) }),
+
+  getNotifications: () => request('/api/notifications'),
+  markNotificationRead: (id) => request(`/api/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: () => request('/api/notifications/read-all', { method: 'POST' })
 };

@@ -17,7 +17,7 @@ export const initialForm = {
   mode: 'Protecao server-side',
   desktopDestination: 'primary',
   mobileDestination: 'primary',
-  domain: 'go.seudominio.com',
+  domain: 'cloaker.lol',
   rateLimitPerMinute: 20,
   fallbackThreshold: 45,
   blockedCountries: '',

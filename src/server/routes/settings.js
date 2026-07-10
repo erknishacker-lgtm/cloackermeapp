@@ -11,6 +11,9 @@ export function createSettingsRouter(store) {
     const next = { ...store.settings };
     if (req.body?.allowSimulate !== undefined) next.allowSimulate = Boolean(req.body.allowSimulate);
     if (req.body?.autoBlockEnabled !== undefined) next.autoBlockEnabled = Boolean(req.body.autoBlockEnabled);
+    if (req.body?.accessNotificationsEnabled !== undefined) {
+      next.accessNotificationsEnabled = Boolean(req.body.accessNotificationsEnabled);
+    }
     if (req.body?.operatorEmail !== undefined) next.operatorEmail = String(req.body.operatorEmail || '');
     if (req.body?.supportWhatsapp !== undefined) next.supportWhatsapp = String(req.body.supportWhatsapp || '');
     store.settings = next;

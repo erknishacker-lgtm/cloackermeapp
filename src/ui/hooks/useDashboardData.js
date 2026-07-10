@@ -30,7 +30,8 @@ export function useDashboardData({ enabled = true } = {}) {
   const [settings, setSettings] = useState({
     allowSimulate: true,
     autoBlockEnabled: true,
-    operatorEmail: 'admin@mycloaker.local',
+    accessNotificationsEnabled: true,
+    operatorEmail: 'louzada@cloaker.lol',
     supportWhatsapp: ''
   });
   const [stats, setStats] = useState(emptyStats);
@@ -51,7 +52,7 @@ export function useDashboardData({ enabled = true } = {}) {
       ]);
 
       if (campaignsRes.status === 401) {
-        setError('Sessao expirada. Entre novamente com o ADMIN_TOKEN.');
+        setError('Sessao expirada. Entre novamente com usuario e senha.');
         return;
       }
       if (!campaignsRes.ok) throw new Error('Falha ao carregar campanhas');

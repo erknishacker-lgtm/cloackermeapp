@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, clearAdminToken, getAdminToken } from './api/client.js';
+import { api, clearAdminToken, getAdminToken, getStoredUser, setStoredUser } from './api/client.js';
+import { NotificationBell } from './components/NotificationBell.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { useDashboardData } from './hooks/useDashboardData.js';
 import { AccessPage } from './pages/AccessPage.jsx';
@@ -14,6 +15,7 @@ import { SettingsPage } from './pages/SettingsPage.jsx';
 export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [user, setUser] = useState(getStoredUser());
   const [activePage, setActivePage] = useState('dashboard');
   const data = useDashboardData({ enabled: authChecked && !needsLogin });
   const activeCampaign = data.campaigns.find((c) => c.status === 'active') || data.campaigns[0];
@@ -23,17 +25,6 @@ export default function App() {
 
     async function checkAuth() {
       try {
-        const health = await api.health();
-        const authRequired = Boolean(health.payload?.authRequired);
-
-        if (!authRequired) {
-          if (!cancelled) {
-            setNeedsLogin(false);
-            setAuthChecked(true);
-          }
-          return;
-        }
-
         if (!getAdminToken()) {
           if (!cancelled) {
             setNeedsLogin(true);
@@ -42,19 +33,31 @@ export default function App() {
           return;
         }
 
-        const probe = await api.getCampaigns();
+        const me = await api.me();
         if (!cancelled) {
-          if (probe.status === 401) {
+          if (me.ok && me.payload?.user) {
+            setUser(me.payload.user);
+            setStoredUser(me.payload.user);
+            setNeedsLogin(false);
+          } else if (me.status === 401) {
             clearAdminToken();
+            setUser(null);
             setNeedsLogin(true);
           } else {
-            setNeedsLogin(false);
+            // token legado / backend sem /me ainda
+            const probe = await api.getCampaigns();
+            if (probe.status === 401) {
+              clearAdminToken();
+              setNeedsLogin(true);
+            } else {
+              setNeedsLogin(false);
+            }
           }
           setAuthChecked(true);
         }
       } catch {
         if (!cancelled) {
-          setNeedsLogin(false);
+          setNeedsLogin(true);
           setAuthChecked(true);
         }
       }
@@ -66,8 +69,14 @@ export default function App() {
     };
   }, []);
 
-  function logout() {
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      // ignore
+    }
     clearAdminToken();
+    setUser(null);
     setNeedsLogin(true);
   }
 
@@ -75,7 +84,8 @@ export default function App() {
     return (
       <div className="login-shell">
         <div className="panel login-card">
-          <p>Carregando...</p>
+          <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo large" />
+          <p>Carregando Cloaker.lol...</p>
         </div>
       </div>
     );
@@ -84,7 +94,8 @@ export default function App() {
   if (needsLogin) {
     return (
       <LoginPage
-        onLoggedIn={() => {
+        onLoggedIn={(nextUser) => {
+          setUser(nextUser || getStoredUser());
           setNeedsLogin(false);
           data.refreshData();
         }}
@@ -144,9 +155,20 @@ export default function App() {
         activePage={activePage}
         setActivePage={setActivePage}
         settings={data.settings}
+        user={user}
         onLogout={logout}
       />
       <main className={`content page-${activePage}`}>
+        <div className="topbar">
+          <div />
+          <NotificationBell
+            enabled={data.settings?.accessNotificationsEnabled !== false}
+            onOpenAccess={() => {
+              setActivePage('access');
+              data.refreshData();
+            }}
+          />
+        </div>
         {data.error && <div className="message error-banner">{data.error}</div>}
         {page}
       </main>

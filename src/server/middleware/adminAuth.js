@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 
 function extractToken(req) {
-  const header = req.headers['x-admin-token'];
+  const header = req.headers['x-admin-token'] || req.headers['x-session-token'];
   if (header) return String(header);
 
   const auth = req.headers.authorization || '';
@@ -17,18 +17,59 @@ function extractToken(req) {
 }
 
 /**
- * Protege /api/* quando ADMIN_TOKEN estiver definido.
- * /health e /r/* permanecem públicos.
+ * Protege /api/* (exceto rotas publicas de auth).
+ * Aceita:
+ * - sessao de usuario (login/senha)
+ * - ADMIN_TOKEN de ambiente (override opcional)
  */
-export function adminAuth(req, res, next) {
-  const expected = config.adminToken;
-  if (!expected) return next();
+export function adminAuth(store) {
+  return function adminAuthMiddleware(req, res, next) {
+    store.pruneExpiredBlocks?.();
+    const provided = extractToken(req);
 
-  const provided = extractToken(req);
-  if (provided && provided === expected) return next();
+    if (provided && config.adminToken && provided === config.adminToken) {
+      req.authUser = {
+        id: 'env_admin',
+        username: 'admin',
+        role: 'owner',
+        fullAccess: true,
+        displayName: 'Admin'
+      };
+      req.authToken = provided;
+      return next();
+    }
 
-  return res.status(401).json({
-    errors: ['unauthorized'],
-    message: 'Informe o ADMIN_TOKEN (header x-admin-token ou Authorization Bearer).'
-  });
+    if (provided && store.sessions?.has(provided)) {
+      const session = store.sessions.get(provided);
+      if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+        store.sessions.delete(provided);
+        store.touch();
+      } else {
+        const user = store.users.find((item) => item.id === session.userId);
+        if (user) {
+          req.authUser = user;
+          req.authToken = provided;
+          return next();
+        }
+      }
+    }
+
+    // Sem token: se existir ao menos 1 usuario, exige login
+    if ((store.users || []).length > 0) {
+      return res.status(401).json({
+        errors: ['unauthorized'],
+        message: 'Faca login com usuario e senha.'
+      });
+    }
+
+    // Fallback legado: ADMIN_TOKEN obrigatorio se configurado e sem usuarios
+    if (config.adminToken) {
+      return res.status(401).json({
+        errors: ['unauthorized'],
+        message: 'Informe o ADMIN_TOKEN ou faca login.'
+      });
+    }
+
+    return next();
+  };
 }

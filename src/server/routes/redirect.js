@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { config } from '../config.js';
 import { evaluateRequest, trackViolation } from '../security.js';
 import { getClientIp } from '../utils/ip.js';
+import { pushAccessNotification } from './notifications.js';
 
 export function createRedirectRouter(store) {
   const router = Router();
@@ -65,6 +66,7 @@ export function createRedirectRouter(store) {
     };
 
     store.events = [event, ...store.events].slice(0, config.maxEvents);
+    pushAccessNotification(store, event);
     store.touch();
 
     return res.redirect(302, result.targetUrl);

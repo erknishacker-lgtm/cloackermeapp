@@ -1,14 +1,12 @@
-import { LogOut, Shield, User, Zap } from 'lucide-react';
+import { LogOut, User, Zap } from 'lucide-react';
 import { navItems } from '../constants.js';
 
-export function Sidebar({ activePage, setActivePage, settings, onLogout }) {
+export function Sidebar({ activePage, setActivePage, settings, user, onLogout }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">
-          <Shield size={26} />
-        </div>
-        <strong>MyCloaker</strong>
+        <img src="/logo.jpg" alt="Cloaker.lol" className="brand-logo" />
+        <strong>Cloaker.lol</strong>
       </div>
 
       <nav className="nav">
@@ -47,7 +45,10 @@ export function Sidebar({ activePage, setActivePage, settings, onLogout }) {
         )}
         <div className="account">
           <User size={17} />
-          <span>{settings?.operatorEmail || 'admin@mycloaker.local'}</span>
+          <span>
+            {user?.displayName || user?.username || settings?.operatorEmail || 'operador'}
+            {user?.role === 'owner' ? ' · owner' : ''}
+          </span>
         </div>
         <button className="logout" type="button" onClick={onLogout} title="Sair do painel">
           <LogOut size={18} />
