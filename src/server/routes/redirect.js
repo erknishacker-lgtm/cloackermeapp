@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config.js';
 import { evaluateRequest, trackViolation } from '../security.js';
+import { extractVisitorGeo } from '../utils/geo.js';
 import { getClientIp } from '../utils/ip.js';
 import { parseCookieHeader } from '../utils/password.js';
 import { pushAccessNotification } from './notifications.js';
@@ -24,9 +25,7 @@ function resolveTestMode(store, req, campaign) {
     return { active: false, reason: 'test_mode_ip_mismatch' };
   }
 
-  // Token valido: liberar principal (mesmo sem ?test=1, mas preferimos com)
   if (session.campaignSlug && session.campaignSlug !== campaign.slug) {
-    // token de outra campanha ainda libera teste se mesmo dono — opcional: so mesma campanha
     if (session.campaignId && session.campaignId !== campaign.id) {
       return { active: false };
     }
@@ -47,12 +46,14 @@ export function createRedirectRouter(store) {
       return res.status(404).send('Campanha nao encontrada');
     }
 
+    const geo = extractVisitorGeo(req);
+
     const input = {
       ip: getClientIp(req),
       userAgent: req.headers['user-agent'] || '',
       accept: req.headers.accept || '',
       acceptLanguage: req.headers['accept-language'] || '',
-      country: req.headers['cf-ipcountry'] || req.headers['x-country-code'] || req.query.country || '',
+      country: geo.country || req.query.country || '',
       asn: req.headers['x-asn'] || req.headers['cf-asn'] || req.query.asn || '',
       headers: req.headers,
       now: Date.now()
@@ -96,7 +97,12 @@ export function createRedirectRouter(store) {
       riskScore: result.riskScore,
       reasons: result.reasons,
       device: result.device,
-      country: result.country || input.country || '',
+      country: result.country || geo.country || '',
+      city: geo.city || '',
+      region: geo.region || '',
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      timezone: geo.timezone || 'UTC',
       asn: result.asn || input.asn || '',
       targetUrl: result.targetUrl,
       createdAt: new Date().toISOString()

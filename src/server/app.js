@@ -9,6 +9,7 @@ import { createBlockedIpsRouter } from './routes/blockedIps.js';
 import { createCampaignsRouter } from './routes/campaigns.js';
 import { createDomainsRouter } from './routes/domains.js';
 import { createEventsRouter } from './routes/events.js';
+import { createLocationsRouter } from './routes/locations.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import { createRedirectRouter } from './routes/redirect.js';
 import { createRouteListsRouter } from './routes/routeLists.js';
@@ -47,6 +48,7 @@ export function createApp(options = {}) {
   app.use('/api/auth', createAuthRouter(store, requireAuth));
   app.use('/api/campaigns', requireAuth, createCampaignsRouter(store));
   app.use('/api/events', requireAuth, createEventsRouter(store));
+  app.use('/api/locations', requireAuth, createLocationsRouter(store));
   app.use('/api/stats', requireAuth, createStatsRouter(store));
   app.use('/api/domains', requireAuth, createDomainsRouter(store));
   app.use('/api/blocked-ips', requireAuth, createBlockedIpsRouter(store));

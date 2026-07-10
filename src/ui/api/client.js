@@ -99,6 +99,10 @@ export const api = {
     const query = new URLSearchParams(params).toString();
     return request(`/api/events${query ? `?${query}` : ''}`);
   },
+  getLocations: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/locations${query ? `?${query}` : ''}`);
+  },
   getStats: () => request('/api/stats'),
 
   getDomains: () => request('/api/domains'),
