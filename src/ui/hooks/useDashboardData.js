@@ -102,11 +102,21 @@ export function useDashboardData({ enabled = true } = {}) {
     try {
       const { response, payload } = await api.createCampaign(form);
       if (!response.ok) {
-        setMessage(`Nao foi possivel criar: ${payload?.errors?.join(', ') || 'erro desconhecido'}`);
+        setMessage(`Nao foi possivel criar: ${payload?.errors?.join(', ') || payload?.message || 'erro desconhecido'}`);
         return;
       }
-      setMessage(`Campanha criada: /r/${payload.slug}`);
-      setForm({ ...initialForm, domain: form.domain });
+      const host = String(payload.domain || form.domain || (typeof window !== 'undefined' ? window.location.host : 'cloaker.lol'))
+        .replace(/^https?:\/\//i, '')
+        .replace(/\/$/, '');
+      const full = `https://${host}/r/${payload.slug}`;
+      setMessage(`Cloaker criado. Link mascarado: ${full}`);
+      try {
+        await navigator.clipboard.writeText(full);
+        setMessage(`Cloaker criado. Link copiado: ${full}`);
+      } catch {
+        // clipboard pode falhar sem HTTPS
+      }
+      setForm({ ...initialForm, domain: form.domain || host });
       await refreshData();
     } catch {
       setMessage('Falha ao conectar no backend.');

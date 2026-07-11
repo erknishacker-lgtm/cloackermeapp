@@ -1,6 +1,10 @@
 import {
   AlertTriangle,
+  Check,
+  Copy,
+  ExternalLink,
   FlaskConical,
+  Link2,
   Monitor,
   Pause,
   Play,
@@ -8,10 +12,57 @@ import {
   Smartphone,
   Trash2
 } from 'lucide-react';
+import { useState } from 'react';
 import { Field } from '../components/Field.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
 import { SelectShell } from '../components/SelectShell.jsx';
 import { modes, platforms } from '../constants.js';
+
+/** Monta o link mascarado completo: https://dominio/r/slug */
+export function buildMaskUrl(campaign) {
+  if (!campaign?.slug) return '';
+  const rawDomain = String(campaign.domain || '').trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+  const host =
+    rawDomain && !/seudominio|localhost|example\.com/i.test(rawDomain)
+      ? rawDomain
+      : typeof window !== 'undefined'
+        ? window.location.host
+        : 'cloaker.lol';
+  const protocol =
+    typeof window !== 'undefined' && window.location.protocol === 'http:' ? 'http:' : 'https:';
+  return `${protocol}//${host}/r/${campaign.slug}`;
+}
+
+function CopyLinkRow({ url, label }) {
+  const [copied, setCopied] = useState(false);
+  if (!url) return null;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copie o link mascarado:', url);
+    }
+  }
+
+  return (
+    <div className="mask-link-row">
+      {label ? <span className="mask-link-label">{label}</span> : null}
+      <code className="mask-link-url" title={url}>
+        {url}
+      </code>
+      <button type="button" className="ghost-button mask-copy-btn" onClick={copy} title="Copiar link">
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+        {copied ? 'Copiado' : 'Copiar'}
+      </button>
+      <a className="ghost-button mask-open-btn" href={url} target="_blank" rel="noreferrer" title="Abrir link">
+        <ExternalLink size={16} />
+      </a>
+    </div>
+  );
+}
 
 export function CampaignsPage({
   form,
@@ -26,7 +77,17 @@ export function CampaignsPage({
   deleteCampaign,
   startCampaignTest
 }) {
-  const publicUrl = activeCampaign ? `/r/${activeCampaign.slug}` : '';
+  const maskPreview =
+    form.slug || form.name
+      ? buildMaskUrl({
+          slug: form.slug || String(form.name || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, ''),
+          domain: form.domain
+        })
+      : '';
+  const activeMaskUrl = activeCampaign ? buildMaskUrl(activeCampaign) : '';
   const domainOptions = [
     ...domains.global.filter((d) => d.active).map((d) => d.domain),
     ...domains.custom.filter((d) => d.active).map((d) => d.domain)
@@ -34,16 +95,22 @@ export function CampaignsPage({
   if (form.domain && !domainOptions.includes(form.domain)) {
     domainOptions.unshift(form.domain);
   }
+  if (!domainOptions.length) {
+    domainOptions.push(typeof window !== 'undefined' ? window.location.host : 'cloaker.lol');
+  }
 
   return (
     <>
-      <PageHeader title="Criar Nova Campanha" subtitle="Adicione um novo link protegido por roteamento inteligente anti-bot" />
+      <PageHeader
+        title="Campanhas / Cloakers"
+        subtitle="Crie o cloaker e copie o link mascarado (https://seu-dominio/r/slug)"
+      />
       <div className="workspace">
         <form className="panel campaign-form" onSubmit={submitCampaign}>
           <div className="panel-title">
             <div>
               <h2>Criar Novo Cloaker</h2>
-              <p>Configure um link de redirecionamento com protecao anti-bot legitima</p>
+              <p>URL principal + alternativa. O link publico mascarado e gerado automatico.</p>
             </div>
             <span className="status-pill">Server-side</span>
           </div>
@@ -56,9 +123,31 @@ export function CampaignsPage({
             />
           </Field>
 
-          <Field label="Slug do Link" hint="Exemplo gerado: /r/minha-campanha" required>
-            <input value={form.slug} onChange={(event) => updateField('slug', event.target.value)} placeholder="minha-campanha" />
+          <Field
+            label="Slug do Link (parte final)"
+            hint="Vira o caminho /r/seu-slug. Ex: oferta1 → https://cloaker.lol/r/oferta1"
+            required
+          >
+            <input
+              value={form.slug}
+              onChange={(event) => updateField('slug', event.target.value)}
+              placeholder="minha-campanha"
+              required
+            />
           </Field>
+
+          {maskPreview ? (
+            <div className="mask-preview-box">
+              <div className="mask-preview-head">
+                <Link2 size={18} />
+                <strong>Link mascarado (prévia)</strong>
+              </div>
+              <CopyLinkRow url={maskPreview} />
+              <p className="mask-preview-note">
+                Este e o link que voce cola no anuncio/trafego. Nao use a URL principal em publico.
+              </p>
+            </div>
+          ) : null}
 
           <Field label="URL Principal" hint="Pagina para visitante que parece real (humano/browser)" required>
             <input
@@ -234,29 +323,42 @@ export function CampaignsPage({
             <span>Headers rigorosos (exige sinais de browser real: Sec-Fetch / client hints)</span>
           </label>
 
-          {message && <div className="message">{message}</div>}
+          {message && (
+            <div className={`message ${String(message).includes('http') || String(message).includes('/r/') ? 'mask-success' : ''}`}>
+              {message}
+            </div>
+          )}
 
           <button className="submit-button" disabled={loading} type="submit">
             <Plus size={18} />
-            {loading ? 'Criando...' : 'Criar Cloaker'}
+            {loading ? 'Criando...' : 'Criar Cloaker e gerar link'}
           </button>
         </form>
 
         <aside className="side-panel">
           <div className="panel compact">
-            <h2>Teste rapido</h2>
-            <p>Use estes links para ver a decisao do backend em tempo real.</p>
-            {publicUrl ? (
+            <h2>
+              <Link2 size={18} /> Link da campanha ativa
+            </h2>
+            {activeMaskUrl ? (
               <>
-                <a className="test-link" href={`${publicUrl}?simulate=human`} target="_blank" rel="noreferrer">
-                  Simular humano
-                </a>
-                <a className="test-link danger" href={`${publicUrl}?simulate=bot`} target="_blank" rel="noreferrer">
-                  Simular robo
-                </a>
+                <CopyLinkRow url={activeMaskUrl} />
+                <p className="mask-preview-note">Copie e use no trafego. Abre o cloaker em /r/{activeCampaign?.slug}.</p>
+                <div className="test-links-row">
+                  <a className="test-link" href={`${activeMaskUrl}`} target="_blank" rel="noreferrer">
+                    Abrir cloaker
+                  </a>
+                  <button
+                    type="button"
+                    className="test-link"
+                    onClick={() => startCampaignTest?.(activeCampaign)}
+                  >
+                    Testar (cookie 1h)
+                  </button>
+                </div>
               </>
             ) : (
-              <div className="empty-mini">Crie uma campanha para habilitar os testes.</div>
+              <div className="empty-mini">Crie uma campanha para gerar o link mascarado.</div>
             )}
           </div>
 
@@ -266,11 +368,12 @@ export function CampaignsPage({
               {campaigns.length === 0 && <div className="empty-mini">Nenhuma campanha ainda.</div>}
               {campaigns.map((campaign) => (
                 <div className="campaign-item managed" key={campaign.id}>
-                  <div>
+                  <div className="campaign-item-main">
                     <strong>{campaign.name}</strong>
-                    <span>
-                      /r/{campaign.slug} · {campaign.status}
+                    <span className="campaign-status-line">
+                      {campaign.status === 'active' ? 'ativa' : campaign.status} · /r/{campaign.slug}
                     </span>
+                    <CopyLinkRow url={buildMaskUrl(campaign)} />
                   </div>
                   <div className="campaign-actions">
                     <button

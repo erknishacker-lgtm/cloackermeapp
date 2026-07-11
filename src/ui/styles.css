@@ -1626,12 +1626,102 @@ td span {
 .campaign-item.managed {
   grid-template-columns: minmax(0, 1fr) auto;
   display: grid;
-  align-items: center;
+  align-items: start;
+  gap: 10px;
+}
+
+.campaign-item-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.campaign-status-line {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .campaign-actions {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
+}
+
+.mask-preview-box {
+  margin: 4px 0 18px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  display: grid;
+  gap: 10px;
+}
+
+.mask-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.mask-preview-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mask-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mask-link-label {
+  font-size: 12px;
+  color: var(--muted-2);
+  width: 100%;
+}
+
+.mask-link-url {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border);
+  color: var(--accent-hover, var(--accent));
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mask-copy-btn,
+.mask-open-btn {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.mask-success {
+  word-break: break-all;
+}
+
+.test-links-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.test-links-row .test-link {
+  border: 0;
+  cursor: pointer;
 }
 
 .error-banner {
