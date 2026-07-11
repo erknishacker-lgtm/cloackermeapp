@@ -1623,6 +1623,16 @@ td span {
   background: rgba(29, 32, 53, 0.5);
 }
 
+.dashboard-empty-hint {
+  margin-bottom: 18px;
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.dashboard-empty-hint code {
+  color: var(--accent);
+}
+
 .campaign-item.managed {
   grid-template-columns: minmax(0, 1fr) auto;
   display: grid;

@@ -46,8 +46,19 @@ export function ownedCampaignSlugs(campaigns, user) {
 export function filterEventsForUser(events, campaigns, user) {
   if (!user) return [];
   if (isAdminUser(user)) return events || [];
-  const slugs = ownedCampaignSlugs(campaigns, user);
-  return (events || []).filter((event) => slugs.has(event.campaignSlug));
+
+  const owned = filterCampaignsForUser(campaigns, user);
+  const slugs = new Set(owned.map((item) => item.slug).filter(Boolean));
+  const ids = new Set(owned.map((item) => item.id).filter(Boolean));
+
+  return (events || []).filter((event) => {
+    // Eventos novos gravam o dono da campanha
+    if (event.campaignUserId && event.campaignUserId === user.id) return true;
+    // Fallback por slug / id da campanha
+    if (event.campaignSlug && slugs.has(event.campaignSlug)) return true;
+    if (event.campaignId && ids.has(event.campaignId)) return true;
+    return false;
+  });
 }
 
 export function assignMissingCampaignOwners(campaigns, ownerId = OWNER_ID) {

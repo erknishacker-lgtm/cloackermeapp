@@ -50,7 +50,7 @@ export function useDashboardData({ enabled = true } = {}) {
     try {
       const [campaignsRes, eventsRes, statsRes, domainsRes, settingsRes] = await Promise.all([
         api.getCampaigns(),
-        api.getEvents({ limit: 100 }),
+        api.getEvents({ limit: 1000 }),
         api.getStats(),
         api.getDomains(),
         api.getSettings()
@@ -62,9 +62,29 @@ export function useDashboardData({ enabled = true } = {}) {
       }
       if (!campaignsRes.ok) throw new Error('Falha ao carregar campanhas');
 
+      const nextEvents = Array.isArray(eventsRes.payload) ? eventsRes.payload : [];
       setCampaigns(campaignsRes.payload || []);
-      setEvents(eventsRes.payload || []);
-      setStats({ ...emptyStats, ...(statsRes.payload || {}) });
+      setEvents(nextEvents);
+
+      // Stats oficiais da API; se falhar, calcula a partir dos eventos carregados
+      if (statsRes.ok && statsRes.payload && typeof statsRes.payload.total === 'number') {
+        setStats({ ...emptyStats, ...statsRes.payload });
+      } else {
+        const allowed = nextEvents.filter((e) => e.decision === 'allow').length;
+        const fallback = nextEvents.filter((e) => e.decision === 'fallback').length;
+        setStats({
+          ...emptyStats,
+          total: nextEvents.length,
+          allowed,
+          fallback,
+          white: allowed,
+          black: fallback,
+          mobile: nextEvents.filter((e) => e.device === 'mobile').length,
+          desktop: nextEvents.filter((e) => e.device !== 'mobile').length,
+          campaigns: Array.isArray(campaignsRes.payload) ? campaignsRes.payload.length : 0
+        });
+      }
+
       setDomains(domainsRes.payload || { global: [], custom: [] });
       if (settingsRes.ok && settingsRes.payload) setSettings(settingsRes.payload);
 

@@ -88,6 +88,7 @@ export function createRedirectRouter(store) {
 
     const event = {
       id: `evt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      campaignId: campaign.id || null,
       campaignSlug: campaign.slug,
       campaignName: campaign.name,
       campaignUserId: campaign.userId || null,
