@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { ipMatchesAny, isBlockActive, normalizeRouteLists } from './utils/ip.js';
+import { emptyRouteLists, ipMatchesAny, isBlockActive, mergeRouteLists, normalizeRouteLists } from './utils/ip.js';
 
 /** User-Agents tipicos de automacao, scrapers e ferramentas de request. */
 const BOT_UA_PATTERN =
@@ -251,9 +251,15 @@ export function evaluateRequest(input, campaign, state = {}) {
     };
   }
 
-  // 0) Listas admin: whitelist IP → real; blacklist IP/UA → blocked
+  // 0) Listas: global (plataforma) + listas do DONO da campanha (cada cliente independente)
   //    real = primaryUrl | blocked = fallbackUrl
-  const listDecision = evaluateListRouting(input, state?.routeLists);
+  const ownerId = campaign.userId || null;
+  const ownerLists =
+    typeof state?.getUserRouteLists === 'function'
+      ? state.getUserRouteLists(ownerId)
+      : normalizeRouteLists(state?.userRouteLists?.[ownerId] || emptyRouteLists());
+  const effectiveLists = mergeRouteLists(state?.routeLists || emptyRouteLists(), ownerLists);
+  const listDecision = evaluateListRouting(input, effectiveLists);
   if (listDecision.route === 'blocked') {
     recordHit(input, state);
     return fallbackResult({

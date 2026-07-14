@@ -142,7 +142,7 @@ export default function App() {
     page = <DashboardPage stats={data.stats} events={data.events} />;
   } else if (activePage === 'access') {
     page = <AccessPage events={data.events} stats={data.stats} refreshData={data.refreshData} />;
-  } else if (activePage === 'domains' && isAdmin) {
+  } else if (activePage === 'domains') {
     page = (
       <DomainsPage
         domains={data.domains}
@@ -151,7 +151,7 @@ export default function App() {
         deleteDomain={data.deleteDomain}
       />
     );
-  } else if (activePage === 'security' && isAdmin) {
+  } else if (activePage === 'security') {
     page = (
       <SecurityPage
         events={data.events}
@@ -163,6 +163,7 @@ export default function App() {
         removeRouteListEntry={data.removeRouteListEntry}
         refreshData={data.refreshData}
         stats={data.stats}
+        isAdmin={isAdmin}
       />
     );
   } else if (activePage === 'users' && isAdmin) {

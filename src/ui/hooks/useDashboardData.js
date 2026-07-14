@@ -88,7 +88,7 @@ export function useDashboardData({ enabled = true } = {}) {
       setDomains(domainsRes.payload || { global: [], custom: [] });
       if (settingsRes.ok && settingsRes.payload) setSettings(settingsRes.payload);
 
-      // Admin-only payloads (ignore 403 for clientes)
+      // Listas: cada usuario tem as suas. Bloqueios globais: so admin.
       const [blockedRes, listsRes] = await Promise.all([api.getBlockedIps(), api.getRouteLists()]);
       if (blockedRes.ok) setBlockedIps(blockedRes.payload || []);
       else setBlockedIps([]);
@@ -98,6 +98,8 @@ export function useDashboardData({ enabled = true } = {}) {
           ipBlacklist: listsRes.payload.ipBlacklist || [],
           ipWhitelist: listsRes.payload.ipWhitelist || []
         });
+      } else {
+        setRouteLists({ uaBlacklist: [], ipBlacklist: [], ipWhitelist: [] });
       }
 
       setError('');

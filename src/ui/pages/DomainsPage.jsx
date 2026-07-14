@@ -13,7 +13,7 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
     const result = await createDomain(domain);
     if (result.ok) {
       setDomain('');
-      setDomainMessage('Dominio adicionado.');
+      setDomainMessage('Dominio salvo. Agora ele aparece ao criar campanha.');
     } else {
       setDomainMessage(result.message);
     }
@@ -35,40 +35,59 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
 
   return (
     <>
-      <PageHeader title="Meus Dominios" subtitle="Gerencie seus dominios personalizados para os cloakers" />
+      <PageHeader
+        title="Meus Dominios"
+        subtitle="Escolha o nome do site que aparece no link do cloaker (ex: cloaker.lol/r/oferta)"
+      />
+
       <section className="panel domains-panel">
         <h2>
-          <Plus size={22} />
-          Adicionar Novo Dominio
-        </h2>
-        <p>Cadastre um dominio para usar em seus cloakers</p>
-        <div className="domain-instructions">
           <Info size={20} />
-          <div>
-            <strong>Para usar dominio personalizado:</strong>
-            <ol>
-              <li>
-                Aponte o DNS (A/CNAME) do dominio para o host onde o backend MyCloaker esta rodando
-              </li>
-              <li>Aguarde a propagacao do DNS (5-30 minutos)</li>
-              <li>Digite seu dominio aqui e clique em Adicionar</li>
-              <li>
-                SSL/TLS: configure via Cloudflare, Caddy, Nginx ou reverse proxy (nao e automatico neste app)
-              </li>
-            </ol>
-          </div>
+          Como funciona (simples)
+        </h2>
+        <div className="domain-instructions leigo">
+          <ol>
+            <li>
+              <strong>Opção mais fácil:</strong> use o dominio global <code>cloaker.lol</code> na campanha. Nada extra
+              pra configurar.
+            </li>
+            <li>
+              <strong>Dominio seu:</strong> se quiser <code>meusite.com/r/oferta</code>, primeiro o dominio precisa
+              apontar pro mesmo servidor do cloaker (DNS no lugar onde comprou o dominio / Cloudflare). Isso e feito
+              fora deste painel.
+            </li>
+            <li>
+              Depois que o dominio ja abre o painel/cloaker no navegador, cadastre o nome aqui so para aparecer no
+              select da campanha e gerar o link completo.
+            </li>
+            <li>
+              <strong>HTTPS (cadeado):</strong> configure no EasyPanel/Cloudflare — o app nao gera certificado sozinho.
+            </li>
+          </ol>
+          <p className="domain-soft-note">
+            Cadastrar aqui <strong>nao</strong> cria o site na internet sozinho. So organiza o nome do link no seu
+            cloaker.
+          </p>
         </div>
+      </section>
+
+      <section className="panel domains-panel">
+        <h2>
+          <Plus size={20} />
+          Adicionar meu dominio
+        </h2>
+        <p>Digite so o nome, sem https:// — ex: go.meusite.com</p>
         <form className="domain-form" onSubmit={addDomain}>
           <Field label="Dominio">
             <input
               value={domain}
               onChange={(event) => setDomain(event.target.value)}
-              placeholder="meudominio.com.br (sem https://)"
+              placeholder="go.meusite.com"
             />
           </Field>
           <button className="domain-button" type="submit">
             <Plus size={18} />
-            Adicionar Dominio
+            Salvar dominio
           </button>
           {domainMessage && <div className="message compact-message">{domainMessage}</div>}
         </form>
@@ -76,18 +95,18 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
 
       <section className="panel domains-panel">
         <h2>
-          <Shield size={22} />
-          Dominios Globais
+          <Shield size={20} />
+          Dominios prontos (da plataforma)
         </h2>
-        <p>Dominios disponibilizados pelo administrador para todos os usuarios</p>
+        <p>Ja funcionam no cloaker — use na campanha se nao tiver dominio proprio.</p>
         <div className="domain-list">
           {domains.global.length ? (
             domains.global.map((item) => (
               <div className="domain-row" key={item.id}>
-                <Globe2 size={24} />
+                <Globe2 size={22} />
                 <div>
                   <strong>{item.domain}</strong>
-                  <span>Dominio global</span>
+                  <span>Pronto para usar no link /r/...</span>
                 </div>
                 <span className={item.active ? 'active-badge' : 'active-badge off'}>
                   {item.active ? 'Ativo' : 'Inativo'}
@@ -95,25 +114,25 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
               </div>
             ))
           ) : (
-            <div className="empty-mini">Nenhum dominio global cadastrado.</div>
+            <div className="empty-mini">Nenhum dominio global. Use o host atual do painel ao criar campanha.</div>
           )}
         </div>
       </section>
 
       <section className="panel domains-panel">
         <h2>
-          <Globe2 size={22} />
-          Meus Dominios
+          <Globe2 size={20} />
+          Dominios que voce cadastrou
         </h2>
-        <p>{domains.custom.length} dominio(s) cadastrado(s)</p>
+        <p>{domains.custom.length} dominio(s)</p>
         <div className="domain-list">
           {domains.custom.length ? (
             domains.custom.map((item) => (
               <div className="domain-row" key={item.id}>
-                <Globe2 size={24} />
+                <Globe2 size={22} />
                 <div>
                   <strong>{item.domain}</strong>
-                  <span>Criado em {new Date(item.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <span>Salvo em {new Date(item.createdAt).toLocaleDateString('pt-BR')}</span>
                 </div>
                 <span className={item.active ? 'active-badge' : 'active-badge off'}>
                   {item.active ? 'Ativo' : 'Inativo'}
@@ -124,7 +143,7 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
                   type="button"
                   onClick={() => updateDomain(item.id, { active: !item.active })}
                 >
-                  <ToggleRight size={32} />
+                  <ToggleRight size={28} />
                 </button>
                 <button className="icon-button" aria-label="Editar dominio" type="button" onClick={() => editDomain(item)}>
                   <Edit3 size={18} />
@@ -140,7 +159,9 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
               </div>
             ))
           ) : (
-            <div className="empty-mini">Nenhum dominio personalizado cadastrado.</div>
+            <div className="empty-mini">
+              Voce ainda nao cadastrou dominio extra. Pode usar so o dominio da plataforma nas campanhas.
+            </div>
           )}
         </div>
       </section>

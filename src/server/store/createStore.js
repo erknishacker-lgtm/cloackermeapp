@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { seedCampaign } from '../utils/campaign.js';
 import { assignMissingCampaignOwners } from '../utils/access.js';
 import { emptyRouteLists, isBlockActive, normalizeRouteLists } from '../utils/ip.js';
+// emptyRouteLists used by getUserRouteLists
 import { createOwnerUser, ensureOwnerUser, OWNER_ID } from '../utils/users.js';
 
 function emptyState(seedDemo = false) {
@@ -14,6 +15,7 @@ function emptyState(seedDemo = false) {
     blockedIps: {},
     violationsByIp: {},
     routeLists: emptyRouteLists(),
+    userRouteLists: {},
     globalDomains: [
       {
         id: 'dom_global_go',
@@ -53,13 +55,29 @@ function hydrateMaps(raw) {
     campaigns,
     events: raw.events || [],
     globalDomains: raw.globalDomains || base.globalDomains,
-    customDomains: raw.customDomains || [],
+    customDomains: migrateDomainOwners(raw.customDomains || [], OWNER_ID),
     users,
     notifications: raw.notifications || [],
     routeLists: normalizeRouteLists(raw.routeLists || base.routeLists),
+    userRouteLists: normalizeUserRouteListsMap(raw.userRouteLists || {}),
     settings: { ...base.settings, ...(raw.settings || {}) }
   };
   return state;
+}
+
+function migrateDomainOwners(domains, ownerId) {
+  return (domains || []).map((item) => ({
+    ...item,
+    userId: item.userId || ownerId
+  }));
+}
+
+function normalizeUserRouteListsMap(raw) {
+  const out = {};
+  for (const [userId, lists] of Object.entries(raw || {})) {
+    out[userId] = normalizeRouteLists(lists);
+  }
+  return out;
 }
 
 function serializeState(store) {
@@ -72,6 +90,7 @@ function serializeState(store) {
     sessions: Object.fromEntries(store.sessions),
     testModes: Object.fromEntries(store.testModes || new Map()),
     routeLists: normalizeRouteLists(store.routeLists),
+    userRouteLists: normalizeUserRouteListsMap(store.userRouteLists || {}),
     globalDomains: store.globalDomains,
     customDomains: store.customDomains,
     users: store.users,
@@ -99,6 +118,8 @@ export function createStore(options = {}) {
   // Always ensure owner exists after load + migrate campaign ownership
   state.users = ensureOwnerUser(state.users);
   state.campaigns = assignMissingCampaignOwners(state.campaigns, OWNER_ID);
+  state.customDomains = migrateDomainOwners(state.customDomains, OWNER_ID);
+  state.userRouteLists = normalizeUserRouteListsMap(state.userRouteLists || {});
   if (!(state.testModes instanceof Map)) {
     state.testModes = new Map(Object.entries(state.testModes || {}));
   }
@@ -207,6 +228,22 @@ export function createStore(options = {}) {
     },
     set routeLists(value) {
       state.routeLists = normalizeRouteLists(value);
+      schedulePersist();
+    },
+    get userRouteLists() {
+      return state.userRouteLists;
+    },
+    /** Listas do usuario (cada cliente tem as suas). */
+    getUserRouteLists(userId) {
+      if (!userId) return emptyRouteLists();
+      return normalizeRouteLists(state.userRouteLists[userId] || {});
+    },
+    setUserRouteLists(userId, lists) {
+      if (!userId) return;
+      state.userRouteLists = {
+        ...state.userRouteLists,
+        [userId]: normalizeRouteLists(lists)
+      };
       schedulePersist();
     },
     touch() {

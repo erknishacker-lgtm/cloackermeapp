@@ -30,13 +30,13 @@ export const initialForm = {
   strictHeaders: false
 };
 
-/** adminOnly: so admin ve no menu. pinBottom: fica no canto inferior do menu. */
+/** adminOnly: so admin ve. pinBottom: canto inferior do menu. */
 export const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'campaigns', label: 'Campanhas', icon: Grid2X2 },
   { id: 'access', label: 'Acessos', icon: Activity },
-  { id: 'domains', label: 'Dominios', icon: Globe2, adminOnly: true },
-  { id: 'security', label: 'Seguranca', icon: ShieldCheck, adminOnly: true },
+  { id: 'domains', label: 'Dominios', icon: Globe2 },
+  { id: 'security', label: 'Seguranca', icon: ShieldCheck },
   { id: 'users', label: 'Usuarios', icon: UserCog, adminOnly: true },
   { id: 'plans', label: 'Planos', icon: Crown, adminOnly: true },
   { id: 'settings', label: 'Configuracoes', icon: Settings },

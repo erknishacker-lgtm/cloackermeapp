@@ -19,49 +19,67 @@ function isValidListEntry(listKey, value) {
   return isValidIpOrCidr(entry);
 }
 
+function readUserLists(store, userId) {
+  return store.getUserRouteLists(userId);
+}
+
+function writeUserLists(store, userId, lists) {
+  store.setUserRouteLists(userId, lists);
+}
+
 export function createRouteListsRouter(store) {
   const router = Router();
 
-  /** Cliente: descobre o IP atual (para tutorial / whitelist). */
+  /** Qualquer usuario: descobre o IP atual. */
   router.get('/my-ip', (req, res) => {
-    if (!requireActiveUser(req, res)) return undefined;
+    const user = requireActiveUser(req, res);
+    if (!user) return undefined;
     const ip = getClientIp(req);
-    const lists = normalizeRouteLists(store.routeLists);
+    const lists = readUserLists(store, user.id);
     const onWhitelist = lists.ipWhitelist.some((entry) => entry === ip);
     return res.json({ ip, onWhitelist });
   });
 
-  /** Cliente: adiciona o proprio IP na whitelist global (autoatendimento). */
+  /** Qualquer usuario: adiciona o proprio IP na SUA whitelist. */
   router.post('/my-ip', (req, res) => {
-    if (!requireActiveUser(req, res)) return undefined;
+    const user = requireActiveUser(req, res);
+    if (!user) return undefined;
     const ip = getClientIp(req);
     if (!isValidIpOrCidr(ip) || ip === 'unknown') {
       return res.status(400).json({
         errors: ['ip_unavailable'],
-        message: 'Nao foi possivel detectar seu IP. Tente de outro rede ou peça ao admin.'
+        message: 'Nao foi possivel detectar seu IP. Tente de outra rede.'
       });
     }
-    const current = normalizeRouteLists(store.routeLists);
+    const current = readUserLists(store, user.id);
     if (!current.ipWhitelist.includes(ip)) {
       current.ipWhitelist = [...current.ipWhitelist, ip];
-      store.routeLists = current;
-      store.touch();
+      writeUserLists(store, user.id, current);
     }
     return res.json({
       ok: true,
       ip,
       onWhitelist: true,
-      message: 'Seu IP foi adicionado a whitelist. Acessos deste IP vao para a URL principal.'
+      message: 'Seu IP foi adicionado a SUA whitelist. Acessos deste IP nas suas campanhas vao para a URL principal.'
     });
   });
 
+  /** Listas do usuario logado (cada cliente e independente). */
   router.get('/', (req, res) => {
+    const user = requireActiveUser(req, res);
+    if (!user) return undefined;
+    return res.json(readUserLists(store, user.id));
+  });
+
+  /** Admin: listas globais da plataforma (aplicam em todas as campanhas). */
+  router.get('/global', (req, res) => {
     if (!requireAdmin(req, res)) return undefined;
-    res.json(normalizeRouteLists(store.routeLists));
+    return res.json(normalizeRouteLists(store.routeLists));
   });
 
   router.put('/', (req, res) => {
-    if (!requireAdmin(req, res)) return undefined;
+    const user = requireActiveUser(req, res);
+    if (!user) return undefined;
     const next = normalizeRouteLists({
       uaBlacklist: req.body?.uaBlacklist,
       ipBlacklist: req.body?.ipBlacklist,
@@ -79,13 +97,19 @@ export function createRouteListsRouter(store) {
       }
     }
 
-    store.routeLists = next;
-    store.touch();
-    return res.json(store.routeLists);
+    writeUserLists(store, user.id, next);
+    return res.json(readUserLists(store, user.id));
   });
 
   router.post('/:list', (req, res) => {
-    if (!requireAdmin(req, res)) return undefined;
+    const user = requireActiveUser(req, res);
+    if (!user) return undefined;
+
+    // rota reservada
+    if (req.params.list === 'global' || req.params.list === 'my-ip') {
+      return res.status(400).json({ errors: ['list_invalid'] });
+    }
+
     const listKey = resolveListKey(req.params.list);
     if (!listKey) {
       return res.status(400).json({ errors: ['list_invalid'], message: 'Lista desconhecida.' });
@@ -99,19 +123,20 @@ export function createRouteListsRouter(store) {
       });
     }
 
-    const current = normalizeRouteLists(store.routeLists);
+    const current = readUserLists(store, user.id);
     if (current[listKey].some((item) => item.toLowerCase() === value.toLowerCase())) {
       return res.status(409).json({ errors: ['entry_exists'], message: 'Entrada ja existe na lista.' });
     }
 
     current[listKey] = [...current[listKey], value];
-    store.routeLists = current;
-    store.touch();
-    return res.status(201).json(store.routeLists);
+    writeUserLists(store, user.id, current);
+    return res.status(201).json(readUserLists(store, user.id));
   });
 
   router.delete('/:list', (req, res) => {
-    if (!requireAdmin(req, res)) return undefined;
+    const user = requireActiveUser(req, res);
+    if (!user) return undefined;
+
     const listKey = resolveListKey(req.params.list);
     if (!listKey) {
       return res.status(400).json({ errors: ['list_invalid'] });
@@ -122,16 +147,15 @@ export function createRouteListsRouter(store) {
       return res.status(400).json({ errors: ['value_required'] });
     }
 
-    const current = normalizeRouteLists(store.routeLists);
+    const current = readUserLists(store, user.id);
     const nextItems = current[listKey].filter((item) => item.toLowerCase() !== value.toLowerCase());
     if (nextItems.length === current[listKey].length) {
       return res.status(404).json({ errors: ['entry_not_found'] });
     }
 
     current[listKey] = nextItems;
-    store.routeLists = current;
-    store.touch();
-    return res.json(store.routeLists);
+    writeUserLists(store, user.id, current);
+    return res.json(readUserLists(store, user.id));
   });
 
   return router;

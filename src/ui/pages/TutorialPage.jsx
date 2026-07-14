@@ -1,24 +1,28 @@
-import { BookOpen, CheckCircle2, FlaskConical, Globe, ShieldCheck, Smartphone } from 'lucide-react';
+import { BookOpen, CheckCircle2, FlaskConical, Globe, Link2, ShieldCheck, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../components/PageHeader.jsx';
 import { api } from '../api/client.js';
 
 const STEPS = [
   {
-    title: 'Entenda o fluxo',
-    body: 'Seu link publico e /r/seu-slug. Visitantes “reais” vao para a URL principal. Trafego bloqueado vai para a URL alternativa.'
+    title: 'O que e o cloaker',
+    body: 'Seu link publico e /r/seu-slug. Visitante “ok” vai para a URL principal. Trafego suspeito vai para a URL alternativa. Voce configura tudo sozinho — sem depender do admin.'
   },
   {
-    title: 'Descubra seu IP',
-    body: 'Para testar como humano sem cair na alternativa, seu IP precisa estar na whitelist. O sistema detecta o IP desta conexao automaticamente.'
+    title: 'Dominios (menu Dominios)',
+    body: 'Pode usar o dominio da plataforma (ex: cloaker.lol) sem configurar nada. Se quiser dominio proprio, aponte o DNS no registrador/Cloudflare e cadastre o nome em Dominios para ele aparecer nas campanhas.'
   },
   {
-    title: 'Coloque o IP na whitelist',
-    body: 'Clique em “Adicionar meu IP a whitelist”. Isso libera a URL principal para o seu aparelho/rede atual por regra global de IP.'
+    title: 'Seguranca (menu Seguranca)',
+    body: 'Cada usuario tem listas proprias: blacklist de User-Agent, blacklist de IP e whitelist de IP. Elas valem so nas SUAS campanhas. Outros clientes nao veem nem usam as suas listas.'
   },
   {
-    title: 'Crie e teste a campanha',
-    body: 'Em Campanhas, crie principal + alternativa. Use o botao de teste (frasco) para abrir /r/slug com cookie de teste de 1 hora — sem depender so da whitelist.'
+    title: 'Whitelist do seu IP',
+    body: 'Para testar sem cair na alternativa, adicione seu IP na whitelist (botao abaixo ou em Seguranca). No celular 4G o IP muda — adicione de novo se precisar.'
+  },
+  {
+    title: 'Campanha + teste',
+    body: 'Em Campanhas, crie principal + alternativa, escolha o dominio e copie o link mascarado. Use o botao de teste (frasco) para abrir /r/slug com cookie de 1 hora.'
   }
 ];
 
@@ -47,7 +51,7 @@ export function TutorialPage({ onComplete, isFirstRun }) {
       const { ok, payload } = await api.addMyIpToWhitelist();
       if (ok) {
         setIpInfo({ ip: payload.ip || ipInfo.ip, onWhitelist: true });
-        setMessage(payload.message || 'IP adicionado a whitelist.');
+        setMessage(payload.message || 'IP adicionado a SUA whitelist.');
       } else {
         setMessage(payload?.message || 'Nao foi possivel adicionar o IP.');
       }
@@ -73,8 +77,8 @@ export function TutorialPage({ onComplete, isFirstRun }) {
         title="Tutorial"
         subtitle={
           isFirstRun
-            ? 'Bem-vindo! Siga estes passos antes de colocar trafego real.'
-            : 'Guia rapido: whitelist, campanha e teste'
+            ? 'Bem-vindo! Em 5 passos voce usa o cloaker sozinho (sem admin).'
+            : 'Guia rapido: dominios, listas, whitelist e campanha'
         }
         icon={BookOpen}
       />
@@ -82,7 +86,10 @@ export function TutorialPage({ onComplete, isFirstRun }) {
       {isFirstRun && (
         <div className="panel tutorial-welcome">
           <strong>Primeiro acesso</strong>
-          <p>Leia o passo a passo abaixo. Depois o Tutorial fica sempre no menu, no canto.</p>
+          <p>
+            Voce tem o mesmo poder operacional do dono da conta nas suas campanhas: Dominios, Seguranca, Campanhas e
+            Acessos. So Usuarios e Planos ficam com o admin da plataforma.
+          </p>
         </div>
       )}
 
@@ -103,7 +110,7 @@ export function TutorialPage({ onComplete, isFirstRun }) {
           <Globe size={22} />
           <div>
             <h2>Seu IP agora</h2>
-            <p>Detectado pelo servidor a partir desta conexao</p>
+            <p>Entra na SUA whitelist (so nas suas campanhas)</p>
           </div>
         </div>
         <div className="tutorial-ip-value">
@@ -132,6 +139,9 @@ export function TutorialPage({ onComplete, isFirstRun }) {
           </li>
           <li>
             <FlaskConical size={16} /> Alternativa rapida: em Campanhas, use o botao de teste (cookie 1h).
+          </li>
+          <li>
+            <Link2 size={16} /> Depois de criar a campanha, o link completo (https://dominio/r/slug) aparece para copiar.
           </li>
         </ul>
       </section>

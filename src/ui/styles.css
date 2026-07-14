@@ -1249,6 +1249,30 @@ td span {
   color: var(--muted);
 }
 
+.domain-instructions.leigo {
+  display: block;
+  flex-direction: column;
+}
+
+.domain-instructions.leigo ol {
+  padding-left: 1.25rem;
+}
+
+.domain-instructions.leigo li {
+  margin-bottom: 10px;
+}
+
+.domain-soft-note {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(5, 196, 217, 0.25);
+  background: rgba(5, 196, 217, 0.08);
+  color: #cdd2df;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
 .domain-form .field {
   margin-bottom: 16px;
 }

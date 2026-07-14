@@ -120,6 +120,22 @@ export function normalizeRouteLists(raw = {}) {
   };
 }
 
+/** Junta varias listas (global + do usuario). Whitelist e blacklist somam. */
+export function mergeRouteLists(...lists) {
+  const out = emptyRouteLists();
+  for (const raw of lists) {
+    const n = normalizeRouteLists(raw || {});
+    out.uaBlacklist.push(...n.uaBlacklist);
+    out.ipBlacklist.push(...n.ipBlacklist);
+    out.ipWhitelist.push(...n.ipWhitelist);
+  }
+  return {
+    uaBlacklist: [...new Set(out.uaBlacklist)],
+    ipBlacklist: [...new Set(out.ipBlacklist)],
+    ipWhitelist: [...new Set(out.ipWhitelist)]
+  };
+}
+
 function normalizeStringList(value) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];

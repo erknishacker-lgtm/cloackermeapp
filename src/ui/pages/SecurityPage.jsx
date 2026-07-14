@@ -167,7 +167,8 @@ export function SecurityPage({
   addRouteListEntry,
   removeRouteListEntry,
   refreshData,
-  stats
+  stats,
+  isAdmin = false
 }) {
   const [ip, setIp] = useState('');
   const [reason, setReason] = useState('');
@@ -194,7 +195,7 @@ export function SecurityPage({
     <>
       <PageHeader
         title="Seguranca"
-        subtitle="Listas de roteamento: blacklist / whitelist → real ou blocked"
+        subtitle="Suas listas (so suas campanhas). Preencha com as dicas de cada card."
         action={
           <button className="ghost-button" onClick={refreshData} type="button">
             <RefreshCw size={18} />
@@ -206,35 +207,41 @@ export function SecurityPage({
       <section className="panel security-banner">
         <h2>
           <ListChecks size={22} />
-          Como o roteamento decide
+          Como o filtro decide (nas SUAS campanhas)
         </h2>
         <div className="security-tags">
           <span className="green">
             <ShieldCheck size={16} />
-            IP whitelist → URL real (principal)
+            IP na whitelist → pagina principal
           </span>
           <span className="red">
             <Ban size={16} />
-            IP blacklist → URL blocked (alternativa)
+            IP na blacklist → pagina alternativa
           </span>
           <span className="amber">
             <UserX size={16} />
-            UA blacklist → URL blocked
+            User-Agent na blacklist → alternativa
           </span>
           <span className="blue">
             <Globe2 size={16} />
-            Demais visitantes → URL real
+            Resto → pagina principal
           </span>
           <span className="purple">
             <Clock3 size={16} />
-            CIDR suportado (ex: 10.0.0.0/8)
+            Cada usuario tem listas proprias
           </span>
         </div>
         <p className="security-note">
-          Na campanha: <strong>URL Principal</strong> = destino real · <strong>URL Alternativa</strong> = destino
-          blocked. O link publico continua sendo <code>/r/seu-slug</code>.
+          O link que o visitante usa e <code>https://seu-dominio/r/seu-slug</code>. Estas listas valem para as campanhas
+          que <strong>voce</strong> criou (outros clientes nao veem nem usam as suas).
         </p>
       </section>
+
+      {securityMessage && (
+        <div className="message compact-message" style={{ marginBottom: 12 }}>
+          {securityMessage}
+        </div>
+      )}
 
       <section className="lists-grid">
         <ListManager
@@ -278,48 +285,50 @@ export function SecurityPage({
         <MetricCard label="Ultimos 30 dias" value={stats.month?.fallback ?? blocked.length} tone="blue" icon={BarChart3} />
       </section>
 
-      <section className="panel block-manager">
-        <h2>
-          <Lock size={22} />
-          Bloqueios manuais com expiracao (legado)
-        </h2>
-        <p>
-          IP ou CIDR com motivo e ban automatico (3 em 15 min / 10 em 24h). Preferira as listas acima para roteamento
-          permanente.
-        </p>
-        <form className="block-form" onSubmit={submitBlock}>
-          <input
-            value={ip}
-            onChange={(event) => setIp(event.target.value)}
-            placeholder="IP ou CIDR (ex: 192.168.1.1 ou 10.0.0.0/8)"
-          />
-          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motivo (opcional)" />
-          <button type="submit">Bloquear</button>
-        </form>
-        {securityMessage && <div className="message compact-message">{securityMessage}</div>}
-        {blockedIps.length ? (
-          <div className="blocked-list">
-            {blockedIps.map((item) => (
-              <div className="blocked-row" key={item.ip}>
-                <strong>{item.ip}</strong>
-                <span>
-                  {item.reason || 'Bloqueio manual'}
-                  {item.expiresAt ? ` · expira ${new Date(item.expiresAt).toLocaleString('pt-BR')}` : ''}
-                  {item.source === 'auto' ? ' · auto' : ''}
-                </span>
-                <button type="button" onClick={() => deleteBlockedIp(item.ip)}>
-                  Remover
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-security">
-            <ShieldCheck size={56} />
-            <p>Nenhum bloqueio temporario no momento</p>
-          </div>
-        )}
-      </section>
+      {isAdmin ? (
+        <section className="panel block-manager">
+          <h2>
+            <Lock size={22} />
+            Bloqueios manuais globais (admin)
+          </h2>
+          <p>
+            IP ou CIDR com motivo e ban automatico (3 em 15 min / 10 em 24h). Listas acima ja bastam para o dia a dia
+            de cada cliente.
+          </p>
+          <form className="block-form" onSubmit={submitBlock}>
+            <input
+              value={ip}
+              onChange={(event) => setIp(event.target.value)}
+              placeholder="IP ou CIDR (ex: 192.168.1.1 ou 10.0.0.0/8)"
+            />
+            <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motivo (opcional)" />
+            <button type="submit">Bloquear</button>
+          </form>
+          {securityMessage && <div className="message compact-message">{securityMessage}</div>}
+          {blockedIps.length ? (
+            <div className="blocked-list">
+              {blockedIps.map((item) => (
+                <div className="blocked-row" key={item.ip}>
+                  <strong>{item.ip}</strong>
+                  <span>
+                    {item.reason || 'Bloqueio manual'}
+                    {item.expiresAt ? ` · expira ${new Date(item.expiresAt).toLocaleString('pt-BR')}` : ''}
+                    {item.source === 'auto' ? ' · auto' : ''}
+                  </span>
+                  <button type="button" onClick={() => deleteBlockedIp(item.ip)}>
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-security">
+              <ShieldCheck size={56} />
+              <p>Nenhum bloqueio temporario no momento</p>
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className="security-grid">
         <div className="panel compact">
@@ -327,14 +336,28 @@ export function SecurityPage({
             <AlertTriangle size={20} />
             IPs com Mais Tentativas
           </h2>
-          <p>Clique para bloquear rapidamente</p>
+          <p>
+            {isAdmin
+              ? 'Clique para bloqueio global (admin) ou use as listas acima'
+              : 'Clique para adicionar na SUA blacklist de IPs'}
+          </p>
           {topIps.length ? (
             topIps.slice(0, 5).map((item, index) => (
               <button
                 key={item.key}
                 type="button"
                 className="mini-row as-button"
-                onClick={() => createBlockedIp(item.key, 'bloqueio rapido do painel')}
+                onClick={async () => {
+                  if (isAdmin) {
+                    const result = await createBlockedIp(item.key, 'bloqueio rapido do painel');
+                    setSecurityMessage(result.ok ? 'IP bloqueado (global).' : result.message);
+                  } else {
+                    const result = await addRouteListEntry('ip-blacklist', item.key);
+                    setSecurityMessage(
+                      result.ok ? 'IP adicionado na sua blacklist.' : result.message || 'Nao foi possivel adicionar.'
+                    );
+                  }
+                }}
               >
                 <span>#{index + 1}</span>
                 <strong>{item.key}</strong>
