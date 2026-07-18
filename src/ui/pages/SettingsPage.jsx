@@ -99,7 +99,7 @@ export function SettingsPage({ settings, saveSettings, changePassword, isAdmin }
               setForm((current) => ({ ...current, accessNotificationsEnabled: event.target.checked }))
             }
           />
-          <span>Notificacoes de acessos reais (sino + toasts no painel)</span>
+          <span>Notificacoes de acessos no sino (sem popup na tela)</span>
         </label>
         {isAdmin && (
           <>
