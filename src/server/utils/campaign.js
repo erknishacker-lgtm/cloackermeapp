@@ -1,13 +1,24 @@
 import { slugify } from './slugify.js';
 import { config } from '../config.js';
 
+function isTikTokPlatform(platform) {
+  const p = String(platform || '').toLowerCase();
+  return p.includes('tiktok') || p.includes('tik tok');
+}
+
 export function toCampaign(body = {}) {
   const slug = slugify(body.slug || body.name);
-  const mode = body.mode || 'Protecao server-side';
+  const platform = body.platform || 'Personalizado / Outro';
+  const tiktok = isTikTokPlatform(platform);
+  // TikTok: default mais agressivo (agentes de review passam em “modo suave”)
+  const mode =
+    body.mode || (tiktok ? 'Protecao com fallback agressivo' : 'Protecao server-side');
   const defaultThreshold =
     mode === 'Protecao com fallback agressivo'
       ? config.defaults.aggressiveThreshold
-      : config.defaults.fallbackThreshold;
+      : tiktok
+        ? 30
+        : config.defaults.fallbackThreshold;
 
   return {
     id: body.id || `cmp_${Date.now().toString(36)}`,
@@ -16,7 +27,7 @@ export function toCampaign(body = {}) {
     slug,
     primaryUrl: body.primaryUrl,
     fallbackUrl: body.fallbackUrl,
-    platform: body.platform || 'Personalizado / Outro',
+    platform,
     mode,
     domain: body.domain || config.defaults.domain,
     status: body.status || 'active',
@@ -29,7 +40,9 @@ export function toCampaign(body = {}) {
     protection: {
       enabled: body.protectionEnabled !== false && body.protection?.enabled !== false,
       rateLimitPerMinute: Number(
-        body.rateLimitPerMinute ?? body.protection?.rateLimitPerMinute ?? config.defaults.rateLimitPerMinute
+        body.rateLimitPerMinute ??
+          body.protection?.rateLimitPerMinute ??
+          (tiktok ? 12 : config.defaults.rateLimitPerMinute)
       ),
       fallbackThreshold: Number(
         body.fallbackThreshold ?? body.protection?.fallbackThreshold ?? defaultThreshold
@@ -42,7 +55,14 @@ export function toCampaign(body = {}) {
         body.blockDatacenterAsns ?? body.protection?.blockDatacenterAsns,
         true
       ),
-      strictHeaders: parseBool(body.strictHeaders ?? body.protection?.strictHeaders, false)
+      strictHeaders: parseBool(
+        body.strictHeaders ?? body.protection?.strictHeaders,
+        tiktok // TikTok: headers rigidos por padrao
+      ),
+      blockPlatformAgents: parseBool(
+        body.blockPlatformAgents ?? body.protection?.blockPlatformAgents,
+        true
+      )
     }
   };
 }
@@ -81,6 +101,9 @@ export function applyCampaignPatch(campaign, body = {}) {
     protection.blockDatacenterAsns = parseBool(body.blockDatacenterAsns, true);
   }
   if (body.strictHeaders !== undefined) protection.strictHeaders = parseBool(body.strictHeaders, false);
+  if (body.blockPlatformAgents !== undefined) {
+    protection.blockPlatformAgents = parseBool(body.blockPlatformAgents, true);
+  }
   if (body.protection) {
     Object.assign(protection, body.protection);
     if (body.protection.blockedCountries) {
@@ -100,6 +123,9 @@ export function applyCampaignPatch(campaign, body = {}) {
     }
     if (body.protection.strictHeaders !== undefined) {
       protection.strictHeaders = parseBool(body.protection.strictHeaders, false);
+    }
+    if (body.protection.blockPlatformAgents !== undefined) {
+      protection.blockPlatformAgents = parseBool(body.protection.blockPlatformAgents, true);
     }
   }
   next.protection = protection;

@@ -224,6 +224,81 @@ describe('evaluateRequest', () => {
     expect(result.targetUrl).toBe('https://example.com/real');
     expect(result.reasons).toContain('logs_only_mode');
   });
+
+  test('hard-blocks Bytespider (TikTok/ByteDance crawler) immediately', () => {
+    const result = evaluateRequest(
+      request({
+        userAgent:
+          'Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; Bytespider; https://zhanzhang.toutiao.com/)'
+      }),
+      campaign,
+      { hitsByIp: new Map() }
+    );
+    expect(result.decision).toBe('fallback');
+    expect(result.reasons).toContain('platform_agent_user_agent');
+  });
+
+  test('hard-blocks ByteDance/TikTok ASN (review agents on corporate net)', () => {
+    const result = evaluateRequest(request({ asn: 'AS396986' }), campaign, { hitsByIp: new Map() });
+    expect(result.decision).toBe('fallback');
+    expect(result.reasons).toContain('platform_agent_asn');
+  });
+
+  test('allows real TikTok in-app webview (musical_ly / BytedanceWebview)', () => {
+    const result = evaluateRequest(
+      request({
+        userAgent:
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 musical_ly_32.0.0 BytedanceWebview/d8a21c6',
+        accept: 'text/html,application/xhtml+xml',
+        acceptLanguage: 'pt-BR,pt;q=0.9',
+        headers: {
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'none',
+          'sec-fetch-dest': 'document'
+        }
+      }),
+      {
+        ...campaign,
+        platform: 'TikTok',
+        mode: 'Protecao com fallback agressivo',
+        protection: {
+          ...campaign.protection,
+          strictHeaders: true,
+          fallbackThreshold: 25,
+          blockDatacenterAsns: true
+        }
+      },
+      { hitsByIp: new Map() }
+    );
+    expect(result.decision).toBe('allow');
+    expect(result.targetUrl).toBe('https://example.com/real');
+  });
+
+  test('TikTok profile blocks fake Chrome desktop without client hints', () => {
+    const result = evaluateRequest(
+      request({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
+        accept: 'text/html',
+        acceptLanguage: '',
+        headers: {}
+      }),
+      {
+        ...campaign,
+        platform: 'TikTok',
+        mode: 'Protecao com fallback agressivo',
+        protection: {
+          enabled: true,
+          rateLimitPerMinute: 12,
+          fallbackThreshold: 25,
+          blockDatacenterAsns: true,
+          strictHeaders: true
+        }
+      },
+      { hitsByIp: new Map() }
+    );
+    expect(result.decision).toBe('fallback');
+    expect(result.riskScore).toBeGreaterThanOrEqual(25);
+  });
 });
 
 describe('trackViolation', () => {

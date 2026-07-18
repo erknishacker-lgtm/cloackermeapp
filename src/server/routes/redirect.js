@@ -48,13 +48,23 @@ export function createRedirectRouter(store) {
 
     const geo = extractVisitorGeo(req);
 
+    // ASN: Cloudflare so manda se Transform Rule / Worker expor; aceita varios nomes comuns.
+    const asnHeader =
+      req.headers['cf-asn'] ||
+      req.headers['x-asn'] ||
+      req.headers['x-as-number'] ||
+      req.headers['x-client-asn'] ||
+      req.headers['as-number'] ||
+      req.query.asn ||
+      '';
+
     const input = {
       ip: getClientIp(req),
       userAgent: req.headers['user-agent'] || '',
       accept: req.headers.accept || '',
       acceptLanguage: req.headers['accept-language'] || '',
       country: geo.country || req.query.country || '',
-      asn: req.headers['x-asn'] || req.headers['cf-asn'] || req.query.asn || '',
+      asn: asnHeader,
       headers: req.headers,
       now: Date.now()
     };

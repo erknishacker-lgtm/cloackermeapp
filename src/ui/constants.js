@@ -15,19 +15,19 @@ export const initialForm = {
   slug: '',
   primaryUrl: '',
   fallbackUrl: '',
-  platform: 'Personalizado / Outro',
-  mode: 'Protecao server-side',
+  platform: 'TikTok',
+  mode: 'Protecao com fallback agressivo',
   desktopDestination: 'primary',
   mobileDestination: 'primary',
   domain: 'cloaker.lol',
-  rateLimitPerMinute: 20,
-  fallbackThreshold: 45,
+  rateLimitPerMinute: 12,
+  fallbackThreshold: 25,
   blockedCountries: '',
   blockedAsns: '',
-  blockedUserAgents: '',
+  blockedUserAgents: 'bytespider, headless, selenium, puppeteer',
   blockedIps: '',
   blockDatacenterAsns: true,
-  strictHeaders: false
+  strictHeaders: true
 };
 
 /** adminOnly: so admin ve. pinBottom: canto inferior do menu. */
@@ -43,6 +43,15 @@ export const navItems = [
   { id: 'tutorial', label: 'Tutorial', icon: BookOpen, pinBottom: true }
 ];
 
-export const platforms = ['Personalizado / Outro', 'Email', 'Afiliados', 'Busca Organica', 'Parceiros'];
+export const platforms = [
+  'TikTok',
+  'Personalizado / Outro',
+  'Email',
+  'Afiliados',
+  'Busca Organica',
+  'Parceiros',
+  'Meta / Facebook',
+  'Google Ads'
+];
 
 export const modes = ['Protecao server-side', 'Protecao com fallback agressivo', 'Somente logs'];

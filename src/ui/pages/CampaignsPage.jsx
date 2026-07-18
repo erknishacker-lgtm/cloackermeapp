@@ -172,7 +172,30 @@ export function CampaignsPage({
           <div className="form-row">
             <Field label="Plataforma / Origem" required>
               <SelectShell>
-                <select value={form.platform} onChange={(event) => updateField('platform', event.target.value)}>
+                <select
+                  value={form.platform}
+                  onChange={(event) => {
+                    const platform = event.target.value;
+                    updateField('platform', platform);
+                    // Preset TikTok Ads: agents de review usam desktop/datacenter/headless
+                    if (String(platform).toLowerCase().includes('tiktok')) {
+                      updateField('mode', 'Protecao com fallback agressivo');
+                      updateField('fallbackThreshold', 25);
+                      updateField('rateLimitPerMinute', 12);
+                      updateField('strictHeaders', true);
+                      updateField('blockDatacenterAsns', true);
+                      if (!String(form.blockedUserAgents || '').toLowerCase().includes('bytespider')) {
+                        const base = String(form.blockedUserAgents || '').trim();
+                        updateField(
+                          'blockedUserAgents',
+                          base
+                            ? `${base}, bytespider, headless, selenium, puppeteer`
+                            : 'bytespider, headless, selenium, puppeteer'
+                        );
+                      }
+                    }
+                  }}
+                >
                   {platforms.map((item) => (
                     <option key={item}>{item}</option>
                   ))}
@@ -225,9 +248,13 @@ export function CampaignsPage({
               <strong>Como o filtro funciona:</strong>
               <ul>
                 <li>
-                  Analisa <strong>User-Agent</strong>, <strong>IP</strong> e <strong>headers</strong> do visitante.
+                  Analisa <strong>User-Agent</strong>, <strong>IP/ASN</strong> e <strong>headers</strong> do visitante.
                 </li>
                 <li>Quem parece real vai para a URL principal; o resto para a URL alternativa.</li>
+                <li>
+                  <strong>TikTok:</strong> bloqueia Bytespider e ASN da ByteDance (agentes). Usuario real do app
+                  (BytedanceWebview / musical_ly) continua liberado.
+                </li>
                 <li>Cada decisao fica registrada em Acessos (metrificacao).</li>
               </ul>
             </div>

@@ -24,9 +24,18 @@ import { PageHeader } from '../components/PageHeader.jsx';
 const LIST_TIPS = {
   'ua-blacklist': {
     title: 'O que colocar aqui?',
-    body: 'Adicione trechos do User-Agent que voce quer bloquear. Se o visitante tiver esse texto no User-Agent, ele vai para a pagina alternativa.',
-    examples: ['curl', 'wget', 'python-requests', 'scrapy', 'headless', 'selenium', 'puppeteer', 'postman'],
-    tip: "Use trechos curtos, nao o User-Agent inteiro. Exemplo: 'curl' bloqueia curl/7.68.0 e curl/8.0.1."
+    body: 'Adicione trechos do User-Agent que voce quer bloquear. Se o visitante tiver esse texto no User-Agent, ele vai para a pagina alternativa. TikTok: Bytespider e agents ja sao bloqueados no motor; NAO bloqueie “musical_ly” ou “BytedanceWebview” (isso e usuario real do app).',
+    examples: [
+      'bytespider',
+      'headless',
+      'selenium',
+      'puppeteer',
+      'curl',
+      'python-requests',
+      'scrapy',
+      'postman'
+    ],
+    tip: "Use trechos curtos. Em campanha TikTok, marque plataforma = TikTok para perfil mais rigido (ASN ByteDance + agents)."
   },
   'ip-blacklist': {
     title: 'O que colocar aqui?',

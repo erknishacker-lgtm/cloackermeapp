@@ -1,11 +1,24 @@
 import { config } from './config.js';
 import { emptyRouteLists, ipMatchesAny, isBlockActive, mergeRouteLists, normalizeRouteLists } from './utils/ip.js';
 
-/** User-Agents tipicos de automacao, scrapers e ferramentas de request. */
+/**
+ * Automacao / scrapers genericos (sobe score; em geral ja bloqueia).
+ * NAO incluir "tiktok" nem "musical_ly" nem "bytedancewebview" — isso e browser in-app de usuario real.
+ */
 const BOT_UA_PATTERN =
-  /(bot|crawler|spider|headless|phantom|selenium|playwright|puppeteer|curl|wget|python-requests|httpclient|scrapy|postman|go-http-client|java\/|okhttp|axios|libwww|httpie|aiohttp|node-fetch|undici|libcurl|scrapy|http.rb|faraday|restsharp)/i;
+  /(bot|crawler|spider|headless|phantom|selenium|playwright|puppeteer|curl|wget|python-requests|httpclient|scrapy|postman|go-http-client|java\/|okhttp|axios|libwww|httpie|aiohttp|node-fetch|undici|libcurl|http\.rb|faraday|restsharp|python-urllib|aiohttp|httpx|scrapy|mechanize|wget|fetch\s|slurp|mediapartners|adsbot|semrush|ahrefs|mj12bot|dotbot|petalbot|yandexbot|baiduspider|duckduckbot|bingpreview|pingdom|uptimerobot|statuscake|gtmetrix|lighthouse|chrome-lighthouse|pagespeed)/i;
+
+/**
+ * Bloqueio HARD imediato (fallback). Crawlers de plataforma / agents explicitos.
+ * Bytespider = crawler da ByteDance (TikTok). NAO e o webview do app do usuario.
+ */
+const HARD_BLOCK_UA_PATTERN =
+  /(bytespider|byte[_\s-]?spider|tiktokspider|tiktok[_\s-]?spider|bytedance[_\s-]?spider|bdspider|toutiaospider|newsarticle|facebookexternalhit|facebot|meta-externalagent|meta-externalfetcher|twitterbot|linkedinbot|pinterestbot|slackbot|discordbot|telegrambot|whatsapp(?!\/)|previewbot|embedly|quora\s*link|outbrain|applebot|storebot-google|adsbot-google|google-inspectiontool|petalbot|seznambot|sogou|exabot|ia_archiver|archive\.org_bot|ccbot|gptbot|chatgpt-user|claudebot|anthropic|perplexitybot|bytespider|tiktokbot)/i;
 
 const MOBILE_UA_PATTERN = /(iphone|ipad|android|mobile|phone)/i;
+
+/** Webview real do app TikTok (usuario clicando no anuncio) — NAO bloquear so por isso. */
+const TIKTOK_INAPP_UA_PATTERN = /(bytedancewebview|musical_ly|tiktok\s|tiktok\/|ttwebview|aweme)/i;
 
 /**
  * ASNs de datacenter / nuvem comumente usados por scanners e automacao.
@@ -39,16 +52,127 @@ const BLOCKED_DATACENTER_ASNS = new Set([
   'AS42831',
   'AS199524',
   'AS395974',
-  'AS40021'
+  'AS40021',
+  // proxies / bot hosts frequentes em review
+  'AS212238',
+  'AS9009',
+  'AS60068',
+  'AS62240',
+  'AS20473',
+  'AS53667',
+  'AS209366',
+  'AS9009'
 ]);
+
+/**
+ * Redes da ByteDance / TikTok (escritorio, crawlers, infra).
+ * Usuario real de anuncio vem de operadora (Vivo, Claro, Verizon…) — nao destas ASNs.
+ * Sempre bloqueadas quando blockPlatformAgents !== false.
+ */
+const PLATFORM_AGENT_ASNS = new Set([
+  'AS396986', // Bytedance Inc (TikTok)
+  'AS138699', // TikTok Pte. Ltd / ByteDance
+  'AS55967', // Beijing Baishan / related infra sometimes seen
+  'AS137718' // Beijing Volcano / ByteDance related ranges
+]);
+
+function isTikTokCampaign(campaign) {
+  const p = normalizeString(campaign?.platform).toLowerCase();
+  return p.includes('tiktok') || p.includes('tik tok') || p === 'tt';
+}
+
+function isPlatformAgentsEnabled(protection) {
+  return protection?.blockPlatformAgents !== false;
+}
+
+function normalizeAsn(asn) {
+  const raw = normalizeString(asn).toUpperCase().replace(/\s+/g, '');
+  if (!raw) return '';
+  if (raw.startsWith('AS')) return raw;
+  if (/^\d+$/.test(raw)) return `AS${raw}`;
+  return raw;
+}
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
 function isDatacenterAsn(asn) {
-  const normalized = normalizeString(asn).toUpperCase().replace(/\s+/g, '');
-  return BLOCKED_DATACENTER_ASNS.has(normalized);
+  return BLOCKED_DATACENTER_ASNS.has(normalizeAsn(asn));
+}
+
+function isPlatformAgentAsn(asn) {
+  return PLATFORM_AGENT_ASNS.has(normalizeAsn(asn));
+}
+
+/**
+ * Sinais de agente/headless que passam se so olharmos "Chrome mobile".
+ * Nao bloqueia webview legitimo do TikTok sozinho.
+ */
+export function scoreAgentSignals(input, { tiktokProfile = false } = {}) {
+  const reasons = [];
+  let riskScore = 0;
+  const ua = normalizeString(input.userAgent);
+  const headers = input.headers || {};
+  const accept = normalizeString(input.accept);
+  const acceptLanguage = normalizeString(input.acceptLanguage);
+  const isInAppTikTok = TIKTOK_INAPP_UA_PATTERN.test(ua);
+  const isMobile = MOBILE_UA_PATTERN.test(ua);
+
+  // Headless / automation fingerprints no UA
+  if (/\bheadlesschrome\b|headless|phantomjs|electron\/|nightmare/i.test(ua)) {
+    riskScore += 55;
+    reasons.push('headless_fingerprint');
+  }
+
+  // WebDriver / automation headers
+  if (headers['x-requested-with'] === 'XMLHttpRequest' && !accept.includes('text/html')) {
+    riskScore += 15;
+    reasons.push('xhr_not_navigation');
+  }
+
+  // Chrome desktop moderno quase sempre manda sec-ch-ua; ausencia + sem language e suspeito
+  const hasChUa = Boolean(headers['sec-ch-ua']);
+  const hasFetchMode = Boolean(headers['sec-fetch-mode']);
+  const hasFetchSite = Boolean(headers['sec-fetch-site']);
+  const hasSecFetch = hasFetchMode || hasFetchSite || Boolean(headers['sec-fetch-dest']);
+
+  if (!isInAppTikTok && /chrome\/|crios\//i.test(ua) && !hasChUa && !hasSecFetch) {
+    riskScore += tiktokProfile ? 30 : 18;
+    reasons.push('chrome_without_client_hints');
+  }
+
+  // Navegacao de anuncio: secao Fetch Mode=navigate e comum em browser real
+  if (!isInAppTikTok && accept.includes('text/html') && !hasFetchMode && !hasChUa) {
+    riskScore += tiktokProfile ? 20 : 10;
+    reasons.push('html_nav_without_sec_fetch');
+  }
+
+  // Idioma ausente em campanha de ads (agentes baratos esquecem)
+  if (!acceptLanguage) {
+    riskScore += tiktokProfile ? 25 : 0; // generico ja pontua em scoreHeaders
+    if (tiktokProfile) reasons.push('tiktok_missing_language');
+  }
+
+  // Perfil TikTok Ads: trafego real e quase todo mobile in-app ou mobile browser
+  if (tiktokProfile && !isMobile && !isInAppTikTok) {
+    riskScore += 28;
+    reasons.push('tiktok_desktop_unlikely');
+  }
+
+  // UA muito curto / generico de lib
+  if (ua && ua.length < 40 && !isInAppTikTok) {
+    riskScore += 20;
+    reasons.push('short_user_agent');
+  }
+
+  // Empty UA ja tratado fora; aqui so reforco
+  if (!ua) {
+    riskScore += 10;
+    reasons.push('empty_ua_agent_signal');
+  }
+
+  return { riskScore, reasons, isInAppTikTok };
 }
 
 function getTargetUrl(campaign, device) {
@@ -228,14 +352,18 @@ export function evaluateRequest(input, campaign, state = {}) {
   const enabled = protection.enabled !== false;
   const userAgent = normalizeString(input.userAgent);
   const country = normalizeString(input.country).toUpperCase();
-  const asn = normalizeString(input.asn).toUpperCase();
+  const asn = normalizeAsn(input.asn);
   const reasons = [];
   let riskScore = 0;
 
   const device = detectDevice(userAgent);
   const now = input.now || Date.now();
   const blockDatacenter = protection.blockDatacenterAsns !== false;
-  const strictHeaders = protection.strictHeaders === true;
+  const tiktokProfile = isTikTokCampaign(campaign);
+  // TikTok Ads: headers mais rigidos por padrao (da pra desligar com strictHeaders: false explicito so se quiser)
+  const strictHeaders =
+    protection.strictHeaders === true || (tiktokProfile && protection.strictHeaders !== false);
+  const platformAgents = isPlatformAgentsEnabled(protection);
 
   // Test mode cookie (mesmo IP do token, 1h) → sempre URL principal
   if (input.testMode === true) {
@@ -282,6 +410,38 @@ export function evaluateRequest(input, campaign, state = {}) {
       country,
       asn
     };
+  }
+
+  // 0b) HARD: crawlers/agents de plataforma (Bytespider, Meta external, etc.)
+  //     NAO inclui webview in-app do TikTok (usuario real do anuncio).
+  if (platformAgents && userAgent && HARD_BLOCK_UA_PATTERN.test(userAgent)) {
+    // Protecao: se for claramente in-app legitimo sem "spider", nao hard-block
+    const isInApp = TIKTOK_INAPP_UA_PATTERN.test(userAgent);
+    const isSpider = /(spider|crawler|bot|externalhit|externalagent|externalfetcher)/i.test(userAgent);
+    if (!isInApp || isSpider) {
+      recordHit(input, state);
+      return fallbackResult({
+        campaign,
+        device,
+        country,
+        asn,
+        reasons: ['platform_agent_user_agent'],
+        riskScore: 100
+      });
+    }
+  }
+
+  // 0c) HARD: ASN da ByteDance/TikTok (agentes de review na rede da empresa)
+  if (platformAgents && asn && isPlatformAgentAsn(asn)) {
+    recordHit(input, state);
+    return fallbackResult({
+      campaign,
+      device,
+      country,
+      asn,
+      reasons: ['platform_agent_asn'],
+      riskScore: 100
+    });
   }
 
   // 1) IP bloqueado globalmente (mapa legado do painel — IP exato / com expiracao)
@@ -362,6 +522,9 @@ export function evaluateRequest(input, campaign, state = {}) {
     const headerScore = scoreHeaders(input, { strictHeaders });
     riskScore += headerScore.riskScore;
     reasons.push(...headerScore.reasons);
+    const agentScore = scoreAgentSignals(input, { tiktokProfile });
+    riskScore += agentScore.riskScore;
+    reasons.push(...agentScore.reasons);
     reasons.push(campaign.mode === 'Somente logs' ? 'logs_only_mode' : 'protection_disabled');
     return {
       decision: 'allow',
@@ -388,20 +551,26 @@ export function evaluateRequest(input, campaign, state = {}) {
   riskScore += headerScore.riskScore;
   reasons.push(...headerScore.reasons);
 
+  // 6b) Sinais de agente / perfil TikTok (headless, desktop em ads, chrome sem hints…)
+  const agentScore = scoreAgentSignals(input, { tiktokProfile });
+  riskScore += agentScore.riskScore;
+  reasons.push(...agentScore.reasons);
+
   // 7) Pais / ASN da campanha
   if (country && (protection.blockedCountries || []).map((item) => item.toUpperCase()).includes(country)) {
     riskScore += 60;
     reasons.push('blocked_country');
   }
 
-  if (asn && (protection.blockedAsns || []).map((item) => item.toUpperCase()).includes(asn)) {
+  if (asn && (protection.blockedAsns || []).map((item) => normalizeAsn(item)).includes(asn)) {
     riskScore += 50;
     reasons.push('blocked_asn');
   }
 
-  // 8) Rate limit por IP
+  // 8) Rate limit por IP (TikTok ads: um pouco mais rígido se perfil)
   const recentHits = getRecentHits(input, state);
-  const limit = Number(protection.rateLimitPerMinute || config.defaults.rateLimitPerMinute);
+  const baseLimit = Number(protection.rateLimitPerMinute || config.defaults.rateLimitPerMinute);
+  const limit = tiktokProfile ? Math.min(baseLimit, 12) : baseLimit;
   if (recentHits.length >= limit) {
     riskScore += 45;
     reasons.push('rate_limit_exceeded');
@@ -413,7 +582,13 @@ export function evaluateRequest(input, campaign, state = {}) {
     reasons.push('browser_headers_present');
   }
 
-  const threshold = resolveThreshold(campaign, protection);
+  // TikTok Ads: limiar mais baixo (agentes “quase browser” precisam de menos pontos pra cair na alternativa)
+  let threshold = resolveThreshold(campaign, protection);
+  if (tiktokProfile) {
+    const cap = campaign.mode === 'Protecao com fallback agressivo' ? 22 : 30;
+    threshold = Math.min(threshold, cap);
+  }
+
   const suspicious = riskScore >= threshold;
 
   return {
