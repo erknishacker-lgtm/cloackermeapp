@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import { initialForm } from '../constants.js';
+import { toast } from '../toast.js';
 
 const emptyStats = {
   total: 0,
@@ -116,32 +117,41 @@ export function useDashboardData({ enabled = true } = {}) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function submitCampaign(event) {
-    event.preventDefault();
+  async function submitCampaign(event, bodyOverride) {
+    if (event?.preventDefault) event.preventDefault();
     setLoading(true);
     setMessage('');
 
+    const body = bodyOverride || form;
+
     try {
-      const { response, payload } = await api.createCampaign(form);
+      const { response, payload } = await api.createCampaign(body);
       if (!response.ok) {
-        setMessage(`Nao foi possivel criar: ${payload?.errors?.join(', ') || payload?.message || 'erro desconhecido'}`);
-        return;
+        const err = `Nao foi possivel criar: ${payload?.errors?.join(', ') || payload?.message || 'erro desconhecido'}`;
+        setMessage(err);
+        toast.error('Campanha', err);
+        return { ok: false };
       }
-      const host = String(payload.domain || form.domain || (typeof window !== 'undefined' ? window.location.host : 'cloaker.lol'))
+      const host = String(payload.domain || body.domain || form.domain || (typeof window !== 'undefined' ? window.location.host : 'cloaker.lol'))
         .replace(/^https?:\/\//i, '')
         .replace(/\/$/, '');
       const full = `https://${host}/r/${payload.slug}`;
-      setMessage(`Cloaker criado. Link mascarado: ${full}`);
+      let msg = `Cloaker criado. Link mascarado: ${full}`;
       try {
         await navigator.clipboard.writeText(full);
-        setMessage(`Cloaker criado. Link copiado: ${full}`);
+        msg = `Cloaker criado. Link copiado: ${full}`;
       } catch {
         // clipboard pode falhar sem HTTPS
       }
-      setForm({ ...initialForm, domain: form.domain || host });
+      setMessage(msg);
+      toast.success('Campanha criada', `Link: /r/${payload.slug}`);
+      setForm({ ...initialForm, domain: body.domain || form.domain || host });
       await refreshData();
+      return { ok: true, payload, maskUrl: full };
     } catch {
       setMessage('Falha ao conectar no backend.');
+      toast.error('Erro', 'Falha ao conectar no backend.');
+      return { ok: false };
     } finally {
       setLoading(false);
     }
@@ -150,10 +160,17 @@ export function useDashboardData({ enabled = true } = {}) {
   async function updateCampaign(id, body) {
     try {
       const { response, payload } = await api.updateCampaign(id, body);
-      if (!response.ok) return { ok: false, message: payload?.errors?.join(', ') || 'Erro ao atualizar.' };
+      if (!response.ok) {
+        toast.error('Campanha', payload?.errors?.join(', ') || 'Erro ao atualizar.');
+        return { ok: false, message: payload?.errors?.join(', ') || 'Erro ao atualizar.' };
+      }
       await refreshData();
+      if (body?.status === 'paused') toast.info('Campanha pausada', 'Voce pode editar e reativar quando quiser.');
+      else if (body?.status === 'active') toast.success('Campanha ativa', 'Link de novo em producao.');
+      else toast.success('Campanha atualizada', 'Alteracoes salvas.');
       return { ok: true };
     } catch {
+      toast.error('Erro', 'Falha ao conectar no backend.');
       return { ok: false, message: 'Falha ao conectar no backend.' };
     }
   }
@@ -161,10 +178,15 @@ export function useDashboardData({ enabled = true } = {}) {
   async function deleteCampaign(id) {
     try {
       const { response } = await api.deleteCampaign(id);
-      if (!response.ok) return { ok: false, message: 'Erro ao excluir campanha.' };
+      if (!response.ok) {
+        toast.error('Campanha', 'Erro ao excluir campanha.');
+        return { ok: false, message: 'Erro ao excluir campanha.' };
+      }
       await refreshData();
+      toast.warning('Campanha excluida', 'Removida da lista.');
       return { ok: true };
     } catch {
+      toast.error('Erro', 'Falha ao conectar no backend.');
       return { ok: false, message: 'Falha ao conectar no backend.' };
     }
   }
@@ -263,7 +285,7 @@ export function useDashboardData({ enabled = true } = {}) {
       const { response, payload } = await api.updateSettings(body);
       if (!response.ok) return { ok: false, message: 'Erro ao salvar configuracoes.' };
       setSettings(payload);
-      return { ok: true };
+      return { ok: true, payload };
     } catch {
       return { ok: false, message: 'Falha ao conectar no backend.' };
     }

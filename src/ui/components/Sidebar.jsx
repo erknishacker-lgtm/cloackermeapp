@@ -1,41 +1,92 @@
-import { LogOut, Menu, User, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { navItems } from '../constants.js';
+import { ChevronDown, LogOut, Menu, X } from '../icons.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import { navTree } from '../constants.js';
 
-export function Sidebar({ activePage, setActivePage, user, onLogout }) {
+const LOGO_SRC = '/logo.png?v=zghost8';
+
+function isChildActive(node, activePage) {
+  if (!node.children) return node.id === activePage;
+  return node.children.some((c) => c.id === activePage);
+}
+
+export function Sidebar({ activePage, setActivePage, user, onLogout, campaignCount = 0 }) {
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'owner' || user?.role === 'admin');
-  const items = navItems.filter((item) => !item.adminOnly || isAdmin);
-  const mainItems = items.filter((item) => !item.pinBottom);
-  const bottomItems = items.filter((item) => item.pinBottom);
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(() => ({ filtro: true, admin: false }));
+
+  const tree = useMemo(
+    () =>
+      navTree.filter((item) => {
+        if (item.adminOnly && !isAdmin) return false;
+        if (item.children) {
+          return item.children.some((c) => !c.adminOnly || isAdmin);
+        }
+        return true;
+      }),
+    [isAdmin]
+  );
+
+  const main = tree.filter((i) => !i.pinBottom);
+  const bottom = tree.filter((i) => i.pinBottom);
 
   useEffect(() => {
     setOpen(false);
   }, [activePage]);
 
-  function accountLabel() {
-    if (isAdmin) {
-      return user?.displayName || user?.username || 'Admin';
+  useEffect(() => {
+    for (const node of navTree) {
+      if (node.children?.some((c) => c.id === activePage)) {
+        setExpanded((prev) => ({ ...prev, [node.id]: true }));
+      }
     }
-    // Nunca cair em e-mail/settings do admin para clientes
+  }, [activePage]);
+
+  function accountLabel() {
+    if (isAdmin) return user?.displayName || user?.username || 'Admin';
     return user?.displayName || user?.username || 'Cliente';
   }
 
-  function NavButtons({ list, compact }) {
-    return list.map((item) => {
-      const Icon = item.icon;
-      return (
+  function NavLeaf({ item, nested }) {
+    const Icon = item.icon;
+    return (
+      <button
+        type="button"
+        className={`nav-item ${nested ? 'nested' : ''} ${item.id === activePage ? 'active' : ''}`}
+        onClick={() => setActivePage(item.id)}
+        title={item.label}
+      >
+        <Icon size={16} />
+        <span>{item.label}</span>
+      </button>
+    );
+  }
+
+  function NavBranch({ node }) {
+    const Icon = node.icon;
+    const kids = (node.children || []).filter((c) => !c.adminOnly || isAdmin);
+    const isOpen = Boolean(expanded[node.id]);
+    const active = isChildActive(node, activePage);
+
+    return (
+      <div className={`nav-branch ${active ? 'has-active' : ''}`}>
         <button
-          className={item.id === activePage ? 'nav-item active' : 'nav-item'}
-          key={item.id}
-          onClick={() => setActivePage(item.id)}
           type="button"
+          className={`nav-item nav-parent ${active ? 'parent-active' : ''}`}
+          onClick={() => setExpanded((prev) => ({ ...prev, [node.id]: !prev[node.id] }))}
         >
-          <Icon size={compact ? 20 : 22} />
-          <span>{item.label}</span>
+          <Icon size={16} />
+          <span>{node.label}</span>
+          <ChevronDown size={14} className={`nav-chevron ${isOpen ? 'open' : ''}`} />
         </button>
-      );
-    });
+        {isOpen ? (
+          <div className="nav-children">
+            {kids.map((child) => (
+              <NavLeaf key={child.id} item={child} nested />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -47,43 +98,64 @@ export function Sidebar({ activePage, setActivePage, user, onLogout }) {
           aria-label={open ? 'Fechar menu' : 'Abrir menu'}
           onClick={() => setOpen((value) => !value)}
         >
-          {open ? <X size={22} /> : <Menu size={22} />}
+          {open ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <img src="/logo.png?v=2" alt="Cloaker.lol" className="mobile-logo" />
-        <div className="mobile-user" title={accountLabel()}>
-          <User size={16} />
+        <div className="mobile-brand">
+          <img src={LOGO_SRC} alt="" className="mobile-logo" />
+          <strong className="brand-word">zGhost</strong>
         </div>
+        <span className="mobile-user-initial" title={accountLabel()}>
+          {(accountLabel().charAt(0) || 'U').toUpperCase()}
+        </span>
       </header>
 
-      {open && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
+      {open ? (
+        <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setOpen(false)} />
+      ) : null}
 
       <aside className={open ? 'sidebar open' : 'sidebar'}>
         <div className="brand">
-          <img src="/logo.png?v=2" alt="Cloaker.lol" className="brand-logo" />
+          <img src={LOGO_SRC} alt="" className="brand-logo" />
+          <strong className="brand-word">zGhost</strong>
         </div>
 
         <nav className="nav" aria-label="Principal">
-          <NavButtons list={mainItems} />
+          {main.map((node) =>
+            node.children ? <NavBranch key={node.id} node={node} /> : <NavLeaf key={node.id} item={node} />
+          )}
         </nav>
 
         <div className="sidebar-footer">
-          {bottomItems.length > 0 && (
+          {bottom.length > 0 ? (
             <nav className="nav nav-bottom" aria-label="Ajuda">
-              <NavButtons list={bottomItems} compact />
+              {bottom.map((node) => (
+                <NavLeaf key={node.id} item={node} />
+              ))}
             </nav>
-          )}
+          ) : null}
 
-          <div className="account">
-            <User size={17} />
-            <span>
-              {accountLabel()}
-              {isAdmin ? ' · admin' : ''}
-            </span>
+          <div className="plan-chip">
+            <div className="plan-chip-head">
+              <span>Starter</span>
+              <span className="plan-chip-meta">{campaignCount} camp.</span>
+            </div>
+            <div className="plan-chip-bar">
+              <div className="plan-chip-fill" style={{ width: '12%' }} />
+            </div>
           </div>
-          <button className="logout" type="button" onClick={onLogout} title="Sair do painel">
-            <LogOut size={18} />
-            <span>Sair</span>
-          </button>
+
+          <div className="account-card">
+            <div className="account-avatar" aria-hidden>
+              {(accountLabel().charAt(0) || 'U').toUpperCase()}
+            </div>
+            <div className="account-meta">
+              <span className="account-name">{accountLabel()}</span>
+              <span className="account-role">{isAdmin ? 'Admin' : 'Cliente'}</span>
+            </div>
+            <button className="account-logout" type="button" onClick={onLogout} title="Sair">
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </aside>
     </>

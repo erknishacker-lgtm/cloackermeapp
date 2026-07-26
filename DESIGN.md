@@ -2,54 +2,42 @@
 
 ## Theme
 
-Dark operational console for night-desk traffic operators.  
-**Color strategy: Restrained** — cool slate neutrals + one blue accent ≤10%.
+Minimal black/white ops console (Cloakup-level density).  
+**Color strategy: Restrained monochrome** — pure dark surfaces + white text + gray borders. Accent = white for primary actions only.
 
-Physical scene: operator at a dim desk, secondary monitor, scanning metrics and lists — trust Linear/Stripe density, not neon cyberpunk.
+Physical scene: operator at a dim desk; interface should disappear into the task.
 
 ## Colors
 
+Dark tokens from the new theme model (adapted; fonts kept local):
+
 | Token | Value | Role |
 |-------|--------|------|
-| `--bg` | `#0a0c10` | Canvas |
-| `--sidebar` | `#0c0f14` | Nav rail |
-| `--panel` | `#12161d` | Surfaces |
-| `--field` | `#0f1319` | Inputs |
-| `--border` | `#242a35` | Structure |
-| `--text` | `#eef1f6` | Primary copy |
-| `--muted` | `#a8b0bd` | Secondary (readable) |
-| `--accent` | `#3d9cfd` | Primary actions / active |
-| Semantic | green / red / amber | Status only |
+| `--background` | oklch(0 0 0) | Canvas pure black |
+| `--sidebar` | oklch(0.18) | Nav rail gray |
+| `--card` / `--panel` | oklch(0.14) | Surfaces |
+| `--secondary` / accent-bg | oklch(0.25–0.32) | Hover / soft |
+| `--border` | oklch(0.26) | Structure |
+| `--muted-foreground` | oklch(0.72) | Secondary text |
+| `--primary` | oklch(1 0 0) | White CTAs |
+| `--radius` | 0.5rem | Squarer corners |
+| `--shadow-sm` | 1–2px soft | Subtle elevation |
 
-No gradient text. No cyan glow stacks. Active nav = soft accent fill + thin border.
+No traffic chart on dashboard. Density: compact.
 
-## Typography
+## Typography (kept)
 
-- Family: **IBM Plex Sans** (single family, product register)
-- H1 ~1.5rem / 600 / -0.02em
-- Body 14px, labels 12–13px
-- Numbers: tabular-nums on metrics
+- Sans: **Oxanium**
+- Serif: **Merriweather** (`.serif`)
+- Mono: **Fira Code**
+- Brand: logo + **ZGHOST**
 
 ## Layout
 
-- Sidebar 260px desktop; icon rail tablet; drawer mobile
-- Content max ~1280px, padding scale 4/8/12/16/20/24/32
-- Radius: 8px controls, 12px panels (never 32px+)
-- Elevation: **border only** on panels (no fat drop + border combo)
+- Sidebar ~232px, logo + **ZGHOST** stacked below
+- Radius 10–12px panels, 8px controls
+- Elevation: 1px border only
 
-## Components
+## Brand
 
-- Nav, panels, fields, primary/ghost buttons, metric cards, pills, tables, tutorial steps
-- Focus ring: 3px accent-soft
-- Hover: quiet surface lift, 160ms ease-out
-
-## Motion
-
-160ms `cubic-bezier(0.22, 1, 0.36, 1)` on color/border.  
-`prefers-reduced-motion: reduce` disables transitions.
-
-## Anti-patterns (project)
-
-- WhatsApp chrome in chrome
-- Loud cyan gradients on every CTA
-- Hero-metric SaaS template with huge numbers + glow
+Ghost mark (`/logo.png`) on black. Wordmark under logo: **ZGHOST**.

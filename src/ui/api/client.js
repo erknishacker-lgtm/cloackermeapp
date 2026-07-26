@@ -79,10 +79,26 @@ export const api = {
 
   login: (username, password) =>
     request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  verify2faLogin: (challengeToken, code) =>
+    request('/api/auth/2fa/verify-login', {
+      method: 'POST',
+      body: JSON.stringify({ challengeToken, code })
+    }),
   me: () => request('/api/auth/me'),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   changePassword: (body) =>
     request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
+
+  get2faStatus: () => request('/api/auth/2fa/status'),
+  setup2fa: () => request('/api/auth/2fa/setup', { method: 'POST' }),
+  enable2fa: (code) => request('/api/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) }),
+  disable2fa: (password, code) =>
+    request('/api/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ password, code }) }),
+
+  getSessions: () => request('/api/auth/sessions'),
+  revokeSession: (id) => request(`/api/auth/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  revokeOtherSessions: () => request('/api/auth/sessions/revoke-others', { method: 'POST' }),
+  revokeAllSessions: () => request('/api/auth/sessions/revoke-all', { method: 'POST' }),
 
   getUsers: () => request('/api/auth/users'),
   createUser: (body) => request('/api/auth/users', { method: 'POST', body: JSON.stringify(body) }),

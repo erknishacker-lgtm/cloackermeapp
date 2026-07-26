@@ -1,17 +1,19 @@
-import { Bell, CheckCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Bell, CheckCheck } from '../icons.jsx';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.js';
+import { toast } from '../toast.js';
 
 /**
- * Sino de acessos: so lista no painel ao clicar.
- * Sem toasts flutuantes — eles piscavam a cada poll/acesso novo.
+ * Sino de acessos + toasts Sileo para itens novos (sem spam no poll).
  */
 export function NotificationBell({ enabled, onOpenAccess }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
+  const seenIds = useRef(new Set());
+  const primed = useRef(false);
 
-  async function load() {
+  async function load({ announce } = { announce: true }) {
     if (enabled === false) {
       setItems([]);
       setUnread(0);
@@ -20,29 +22,51 @@ export function NotificationBell({ enabled, onOpenAccess }) {
     try {
       const { ok, payload } = await api.getNotifications();
       if (!ok) return;
-      setItems(payload.items || []);
+      const nextItems = payload.items || [];
+      setItems(nextItems);
       setUnread(payload.unread || 0);
+
+      // Primeira carga: so marca como vistos (evita rajada de toasts no login)
+      if (!primed.current) {
+        nextItems.forEach((item) => seenIds.current.add(item.id));
+        primed.current = true;
+        return;
+      }
+
+      if (!announce) return;
+
+      const fresh = nextItems.filter((item) => !item.read && !seenIds.current.has(item.id));
+      for (const item of fresh.slice(0, 3)) {
+        seenIds.current.add(item.id);
+        const isBlock = /block|fallback|negad|suspei/i.test(`${item.title} ${item.body}`);
+        const fn = isBlock ? toast.warning : toast.success;
+        fn(item.title || 'Novo acesso', item.body || '');
+      }
+      // Marca o resto como visto sem toast
+      nextItems.forEach((item) => seenIds.current.add(item.id));
     } catch {
       // ignore polling errors
     }
   }
 
   useEffect(() => {
-    load();
+    primed.current = false;
+    seenIds.current = new Set();
+    load({ announce: false });
     if (enabled === false) return undefined;
-    // Poll silencioso: so atualiza contador do sino, sem popup na tela
-    const timer = window.setInterval(load, 15000);
+    const timer = window.setInterval(() => load({ announce: true }), 12000);
     return () => window.clearInterval(timer);
   }, [enabled]);
 
   async function markAll() {
     await api.markAllNotificationsRead();
-    await load();
+    await load({ announce: false });
+    toast.info('Notificacoes', 'Todas marcadas como lidas.');
   }
 
   async function markOne(id) {
     await api.markNotificationRead(id);
-    await load();
+    await load({ announce: false });
   }
 
   if (enabled === false) {

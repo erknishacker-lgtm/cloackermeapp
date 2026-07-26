@@ -41,7 +41,8 @@ export function publicUser(user) {
     active: user.active !== false,
     displayName: user.displayName || user.username,
     email: user.email || '',
-    createdAt: user.createdAt
+    createdAt: user.createdAt,
+    totpEnabled: Boolean(user.totpEnabled)
   };
 }
 

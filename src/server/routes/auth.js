@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { requireAdmin, requireActiveUser } from '../utils/access.js';
+import { getClientIp } from '../utils/ip.js';
 import { createSessionToken, createUserId, hashPassword, verifyPassword } from '../utils/password.js';
+import { parseUserAgent, publicSession } from '../utils/sessionMeta.js';
+import { buildOtpAuthUrl, generateTotpSecret, verifyTotp } from '../utils/totp.js';
 import {
   adminListUser,
   generateTempPassword,
@@ -10,6 +13,7 @@ import {
 } from '../utils/users.js';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60_000;
+const CHALLENGE_TTL_MS = 5 * 60_000;
 
 function cleanUsername(value) {
   return String(value || '')
@@ -38,6 +42,38 @@ function findUserByLogin(store, login) {
   );
 }
 
+function createLoginSession(store, user, req) {
+  const token = createSessionToken();
+  const meta = parseUserAgent(req.headers['user-agent'] || '');
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+  const session = {
+    id: createUserId('ses'),
+    token,
+    userId: user.id,
+    expiresAt,
+    createdAt: now,
+    lastActiveAt: now,
+    ip: getClientIp(req),
+    label: meta.label,
+    os: meta.os,
+    browser: meta.browser,
+    userAgent: meta.userAgent
+  };
+  store.sessions.set(token, session);
+  store.touch();
+  return session;
+}
+
+function prunePending2fa(store) {
+  const now = Date.now();
+  for (const [token, pending] of store.pending2fa.entries()) {
+    if (pending.expiresAt && new Date(pending.expiresAt).getTime() <= now) {
+      store.pending2fa.delete(token);
+    }
+  }
+}
+
 export function createAuthRouter(store, requireAuth) {
   const router = Router();
 
@@ -57,14 +93,63 @@ export function createAuthRouter(store, requireAuth) {
       return res.status(403).json({ errors: ['user_disabled'], message: 'Usuario desativado. Contate o admin.' });
     }
 
-    const token = createSessionToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-    store.sessions.set(token, { token, userId: user.id, expiresAt, createdAt: new Date().toISOString() });
-    store.touch();
+    if (user.totpEnabled && user.totpSecret) {
+      prunePending2fa(store);
+      const challengeToken = createSessionToken();
+      store.pending2fa.set(challengeToken, {
+        userId: user.id,
+        expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+        ip: getClientIp(req),
+        userAgent: req.headers['user-agent'] || ''
+      });
+      store.touch();
+      return res.json({
+        requires2fa: true,
+        challengeToken,
+        message: 'Informe o codigo do autenticador.'
+      });
+    }
 
+    const session = createLoginSession(store, user, req);
     return res.json({
-      token,
-      expiresAt,
+      token: session.token,
+      expiresAt: session.expiresAt,
+      user: publicUser(user)
+    });
+  });
+
+  router.post('/2fa/verify-login', (req, res) => {
+    prunePending2fa(store);
+    const challengeToken = String(req.body?.challengeToken || '');
+    const code = String(req.body?.code || '');
+    const pending = store.pending2fa.get(challengeToken);
+
+    if (!pending) {
+      return res.status(401).json({
+        errors: ['challenge_expired'],
+        message: 'Codigo expirado. Faca login de novo.'
+      });
+    }
+
+    const user = store.users.find((item) => item.id === pending.userId);
+    if (!user?.totpEnabled || !user.totpSecret || !verifyTotp(user.totpSecret, code)) {
+      return res.status(401).json({
+        errors: ['invalid_totp'],
+        message: 'Codigo 2FA invalido.'
+      });
+    }
+
+    store.pending2fa.delete(challengeToken);
+    // reconstroi req-like com UA/IP do desafio se necessario
+    const fakeReq = {
+      headers: { 'user-agent': pending.userAgent || req.headers['user-agent'] },
+      socket: req.socket
+    };
+    // prefer current request IP
+    const session = createLoginSession(store, user, req.headers['user-agent'] ? req : fakeReq);
+    return res.json({
+      token: session.token,
+      expiresAt: session.expiresAt,
       user: publicUser(user)
     });
   });
@@ -132,6 +217,213 @@ export function createAuthRouter(store, requireAuth) {
     store.touch();
 
     return res.json({ ok: true, message: 'Senha atualizada.', user: publicUser(user) });
+  });
+
+  // ---- 2FA setup ----
+  router.get('/2fa/status', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+    const user = store.users.find((item) => item.id === authUser.id);
+    return res.json({
+      enabled: Boolean(user?.totpEnabled),
+      pending: Boolean(user?.totpPendingSecret)
+    });
+  });
+
+  router.post('/2fa/setup', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+
+    const index = store.users.findIndex((item) => item.id === authUser.id);
+    if (index === -1) return res.status(404).json({ errors: ['user_not_found'] });
+
+    const user = { ...store.users[index] };
+    if (user.totpEnabled) {
+      return res.status(400).json({
+        errors: ['already_enabled'],
+        message: '2FA ja esta ativo. Desative antes de reconfigurar.'
+      });
+    }
+
+    const secret = generateTotpSecret();
+    user.totpPendingSecret = secret;
+    const list = [...store.users];
+    list[index] = user;
+    store.users = list;
+    store.touch();
+
+    const account = user.email || user.username;
+    const otpauthUrl = buildOtpAuthUrl({ secret, accountName: account, issuer: 'zGhost' });
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
+
+    return res.json({
+      secret,
+      otpauthUrl,
+      qrUrl,
+      message: 'Escaneie o QR no app autenticador e confirme com o codigo de 6 digitos.'
+    });
+  });
+
+  router.post('/2fa/enable', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+
+    const code = String(req.body?.code || '');
+    const index = store.users.findIndex((item) => item.id === authUser.id);
+    if (index === -1) return res.status(404).json({ errors: ['user_not_found'] });
+
+    const user = { ...store.users[index] };
+    const secret = user.totpPendingSecret;
+    if (!secret) {
+      return res.status(400).json({
+        errors: ['setup_required'],
+        message: 'Inicie a configuracao do 2FA primeiro.'
+      });
+    }
+    if (!verifyTotp(secret, code)) {
+      return res.status(400).json({
+        errors: ['invalid_totp'],
+        message: 'Codigo invalido. Confira o app e tente de novo.'
+      });
+    }
+
+    user.totpSecret = secret;
+    user.totpEnabled = true;
+    delete user.totpPendingSecret;
+    const list = [...store.users];
+    list[index] = user;
+    store.users = list;
+    store.touch();
+
+    return res.json({
+      ok: true,
+      message: '2FA ativado com sucesso.',
+      user: publicUser(user)
+    });
+  });
+
+  router.post('/2fa/disable', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+
+    const password = String(req.body?.password || '');
+    const code = String(req.body?.code || '');
+    const index = store.users.findIndex((item) => item.id === authUser.id);
+    if (index === -1) return res.status(404).json({ errors: ['user_not_found'] });
+
+    const user = { ...store.users[index] };
+    if (!user.totpEnabled) {
+      return res.json({ ok: true, message: '2FA ja estava desativado.', user: publicUser(user) });
+    }
+    if (!verifyPassword(password, user.passwordHash)) {
+      return res.status(401).json({
+        errors: ['invalid_password'],
+        message: 'Senha incorreta.'
+      });
+    }
+    if (!verifyTotp(user.totpSecret, code)) {
+      return res.status(400).json({
+        errors: ['invalid_totp'],
+        message: 'Codigo 2FA invalido.'
+      });
+    }
+
+    user.totpEnabled = false;
+    delete user.totpSecret;
+    delete user.totpPendingSecret;
+    const list = [...store.users];
+    list[index] = user;
+    store.users = list;
+    store.touch();
+
+    return res.json({
+      ok: true,
+      message: '2FA desativado.',
+      user: publicUser(user)
+    });
+  });
+
+  // ---- Sessions / dispositivos ----
+  router.get('/sessions', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+    store.pruneExpiredBlocks?.();
+
+    const sessions = [];
+    for (const [token, s] of store.sessions.entries()) {
+      if (s.userId !== authUser.id) continue;
+      // Sessões antigas (antes do id/meta): completa na hora
+      if (!s.id) s.id = createUserId('ses');
+      if (!s.label) {
+        const meta = parseUserAgent(s.userAgent || '');
+        s.label = meta.label;
+        s.os = s.os || meta.os;
+        s.browser = s.browser || meta.browser;
+      }
+      if (!s.lastActiveAt) s.lastActiveAt = s.createdAt || new Date().toISOString();
+      sessions.push(publicSession(s, { currentToken: req.authToken }));
+      void token;
+    }
+    sessions.sort((a, b) =>
+      String(b.lastActiveAt || b.createdAt).localeCompare(String(a.lastActiveAt || a.createdAt))
+    );
+    store.touch();
+
+    return res.json({ sessions });
+  });
+
+  router.delete('/sessions/:id', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+
+    const id = String(req.params.id || '');
+    let removed = false;
+    for (const [token, session] of store.sessions.entries()) {
+      if (session.userId === authUser.id && session.id === id) {
+        if (token === req.authToken) {
+          return res.status(400).json({
+            errors: ['cannot_revoke_current'],
+            message: 'Use Sair para encerrar este dispositivo.'
+          });
+        }
+        store.sessions.delete(token);
+        removed = true;
+        break;
+      }
+    }
+    if (!removed) return res.status(404).json({ errors: ['session_not_found'] });
+    store.touch();
+    return res.status(204).send();
+  });
+
+  router.post('/sessions/revoke-others', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+
+    let count = 0;
+    for (const [token, session] of store.sessions.entries()) {
+      if (session.userId === authUser.id && token !== req.authToken) {
+        store.sessions.delete(token);
+        count += 1;
+      }
+    }
+    store.touch();
+    return res.json({ ok: true, revoked: count });
+  });
+
+  router.post('/sessions/revoke-all', requireAuth, (req, res) => {
+    const authUser = requireActiveUser(req, res);
+    if (!authUser) return undefined;
+
+    let count = 0;
+    for (const [token, session] of store.sessions.entries()) {
+      if (session.userId === authUser.id) {
+        store.sessions.delete(token);
+        count += 1;
+      }
+    }
+    store.touch();
+    return res.json({ ok: true, revoked: count, loggedOut: true });
   });
 
   // ---- Admin: gerenciar usuarios ----

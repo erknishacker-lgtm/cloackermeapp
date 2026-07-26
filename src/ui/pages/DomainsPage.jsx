@@ -1,4 +1,4 @@
-import { Edit3, Globe2, Info, Plus, Shield, ToggleRight, Trash2 } from 'lucide-react';
+import { Edit3, Globe2, Info, Plus, Shield, ToggleRight, Trash2 } from '../icons.jsx';
 import { useState } from 'react';
 import { Field } from '../components/Field.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
@@ -36,8 +36,9 @@ export function DomainsPage({ domains, createDomain, updateDomain, deleteDomain 
   return (
     <>
       <PageHeader
-        title="Meus Dominios"
-        subtitle="Escolha o nome do site que aparece no link do cloaker (ex: cloaker.lol/r/oferta)"
+        title="Dominios"
+        breadcrumb="Operacao / Dominios"
+        subtitle="Escolha o dominio que aparece no link do cloaker (ex: seu-dominio.com/r/oferta)."
       />
 
       <section className="panel domains-panel">

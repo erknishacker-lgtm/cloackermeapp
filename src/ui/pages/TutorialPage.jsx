@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, FlaskConical, Globe, Link2, ShieldCheck, Smartphone } from 'lucide-react';
+import { BookOpen, CheckCircle2, FlaskConical, Globe, Link2, ShieldCheck, Smartphone } from '../icons.jsx';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../components/PageHeader.jsx';
 import { api } from '../api/client.js';

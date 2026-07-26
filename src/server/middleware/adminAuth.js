@@ -53,8 +53,10 @@ export function adminAuth(store) {
               message: 'Usuario desativado. Contate o admin.'
             });
           }
+          session.lastActiveAt = new Date().toISOString();
           req.authUser = user;
           req.authToken = provided;
+          req.authSession = session;
           return next();
         }
       }

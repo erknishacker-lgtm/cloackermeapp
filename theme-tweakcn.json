@@ -1,0 +1,6 @@
+{
+  "source": "https://tweakcn.com/r/themes/cmho4nr9l000h04l1gu419ckw",
+  "name": "Minimal Neutral",
+  "applied": "dark cssVars mapped into src/ui/styles.css :root",
+  "note": "Project is vanilla React without Tailwind/shadcn CLI — tokens applied manually to match registry."
+}

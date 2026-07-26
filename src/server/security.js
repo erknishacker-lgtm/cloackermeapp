@@ -1,5 +1,6 @@
 import { config } from './config.js';
 import { emptyRouteLists, ipMatchesAny, isBlockActive, mergeRouteLists, normalizeRouteLists } from './utils/ip.js';
+import { PLATFORM_PROFILES, detectPlatformProfile } from './utils/platforms.js';
 
 /**
  * Automacao / scrapers genericos (sobe score; em geral ja bloqueia).
@@ -9,16 +10,39 @@ const BOT_UA_PATTERN =
   /(bot|crawler|spider|headless|phantom|selenium|playwright|puppeteer|curl|wget|python-requests|httpclient|scrapy|postman|go-http-client|java\/|okhttp|axios|libwww|httpie|aiohttp|node-fetch|undici|libcurl|http\.rb|faraday|restsharp|python-urllib|aiohttp|httpx|scrapy|mechanize|wget|fetch\s|slurp|mediapartners|adsbot|semrush|ahrefs|mj12bot|dotbot|petalbot|yandexbot|baiduspider|duckduckbot|bingpreview|pingdom|uptimerobot|statuscake|gtmetrix|lighthouse|chrome-lighthouse|pagespeed)/i;
 
 /**
- * Bloqueio HARD imediato (fallback). Crawlers de plataforma / agents explicitos.
- * Bytespider = crawler da ByteDance (TikTok). NAO e o webview do app do usuario.
+ * Crawlers / agents de todas as plataformas cadastradas em PLATFORM_PROFILES,
+ * concatenados em um unico regex para o bloco HARD. Inclui tambem agentes genericos
+ * de redes sociais (Twitter, LinkedIn, Slack, Discord, Telegram, WhatsApp) e
+ * crawlers de AI / motores de busca.
  */
-const HARD_BLOCK_UA_PATTERN =
-  /(bytespider|byte[_\s-]?spider|tiktokspider|tiktok[_\s-]?spider|bytedance[_\s-]?spider|bdspider|toutiaospider|newsarticle|facebookexternalhit|facebot|meta-externalagent|meta-externalfetcher|twitterbot|linkedinbot|pinterestbot|slackbot|discordbot|telegrambot|whatsapp(?!\/)|previewbot|embedly|quora\s*link|outbrain|applebot|storebot-google|adsbot-google|google-inspectiontool|petalbot|seznambot|sogou|exabot|ia_archiver|archive\.org_bot|ccbot|gptbot|chatgpt-user|claudebot|anthropic|perplexitybot|bytespider|tiktokbot)/i;
+const PLATFORM_CRAWLER_SOURCES = [
+  // crawlers declarados por plataforma
+  ...Object.values(PLATFORM_PROFILES)
+    .map((p) => p.crawlerUaPattern)
+    .filter(Boolean),
+  // agentes genericos de midia social (Twitter/X, LinkedIn, Slack, Discord, Telegram, WhatsApp)
+  /(twitterbot|linkedinbot|slackbot|discordbot|telegrambot|whatsapp(?!\/))/i,
+  // bots de preview / embed (genérico)
+  /(previewbot|embedly|quora\s*link)/i,
+  // crawlers de AI (GPT, Claude, Perplexity, Bing, petalbot, etc.)
+  /(gptbot|chatgpt-user|oai-searchbot|oai[-_]crawler|claudebot|anthropic|claude-web|perplexitybot|perplexity-user|perplexity-ai|perplexity(?!bot))/i,
+  // crawlers genericos de motores de busca
+  /(applebot|petalbot|seznambot|sogou|exabot|ia_archiver|archive\.org_bot|ccbot|bingbot|msnbot|bingpreview)/i
+];
+// fonte extra para "outbrain" simples (sem sufixo -bot quando aparece puro no User-Agent)
+const HARD_EXTRA_PATTERN = /(outbrain|tiktokbot|newsarticle)/i;
+
+function buildHardBlockPattern() {
+  const sources = PLATFORM_CRAWLER_SOURCES.map((src) => src.source.replace(/^\/|\/[a-z]*$/g, ''));
+  const extra = HARD_EXTRA_PATTERN.source.replace(/^\/|\/[a-z]*$/g, '');
+  return new RegExp(`(?:${sources.join('|')}|${extra})`, 'i');
+}
+
+const HARD_BLOCK_UA_PATTERN = buildHardBlockPattern();
 
 const MOBILE_UA_PATTERN = /(iphone|ipad|android|mobile|phone)/i;
 
-/** Webview real do app TikTok (usuario clicando no anuncio) — NAO bloquear so por isso. */
-const TIKTOK_INAPP_UA_PATTERN = /(bytedancewebview|musical_ly|tiktok\s|tiktok\/|ttwebview|aweme)/i;
+const TIKTOK_INAPP_UA_PATTERN = PLATFORM_PROFILES.tiktok.inAppUaPattern;
 
 /**
  * ASNs de datacenter / nuvem comumente usados por scanners e automacao.
@@ -65,20 +89,54 @@ const BLOCKED_DATACENTER_ASNS = new Set([
 ]);
 
 /**
- * Redes da ByteDance / TikTok (escritorio, crawlers, infra).
- * Usuario real de anuncio vem de operadora (Vivo, Claro, Verizon…) — nao destas ASNs.
+ * ASNs de plataforma (crawlers, agentes de review, infra das redes de midia).
+ * O trafego real de usuario vem de operadora / ISP — nao destas ASNs.
  * Sempre bloqueadas quando blockPlatformAgents !== false.
+ * Construido a partir de PLATFORM_PROFILES, mais ASNs genericas compartilhadas.
  */
+const EXTRA_PLATFORM_ASNS = [
+  // Meta / Facebook / Instagram
+  'AS32934', // Meta Platforms (Facebook)
+  // Google Ads / Google Cloud
+  'AS139070', // Google Cloud (EUA)
+  'AS36040', // Google
+  'AS22577', // Google
+  // Kwai / Kuaishou
+  'AS138996', // Beijing Kuaishou
+  'AS140633', // Beijing Daiwei / Kuaishou related
+  // Taboola
+  'AS206813', // Taboola Europe
+  'AS394478', // Taboola US
+  // Pinterest
+  'AS396698', // Pinterest Inc
+  // Yandex
+  'AS13238', // Yandex LLC
+  'AS25513', // Yandex Cloud
+  // Outbrain
+  'AS202426', // Outbrain UK
+  // MGID (ja esta em BLOCKED_DATACENTER_ASNS via AS212238, mas bom ter aqui explicito)
+  'AS212238', // Datacamp / MGID
+  // Revcontent
+  'AS20454' // MediaMath / Revcontent related
+];
+
 const PLATFORM_AGENT_ASNS = new Set([
-  'AS396986', // Bytedance Inc (TikTok)
-  'AS138699', // TikTok Pte. Ltd / ByteDance
-  'AS55967', // Beijing Baishan / related infra sometimes seen
-  'AS137718' // Beijing Volcano / ByteDance related ranges
+  ...Object.values(PLATFORM_PROFILES).flatMap((p) => p.asns || []),
+  ...EXTRA_PLATFORM_ASNS
 ]);
 
+function getProfile(campaign) {
+  return detectPlatformProfile(campaign);
+}
+
 function isTikTokCampaign(campaign) {
-  const p = normalizeString(campaign?.platform).toLowerCase();
-  return p.includes('tiktok') || p.includes('tik tok') || p === 'tt';
+  return getProfile(campaign).key === 'tiktok';
+}
+
+function isInAppWebview(userAgent, profile) {
+  const ua = normalizeString(userAgent);
+  if (!ua || !profile?.inAppUaPattern) return false;
+  return profile.inAppUaPattern.test(ua);
 }
 
 function isPlatformAgentsEnabled(protection) {
@@ -359,10 +417,12 @@ export function evaluateRequest(input, campaign, state = {}) {
   const device = detectDevice(userAgent);
   const now = input.now || Date.now();
   const blockDatacenter = protection.blockDatacenterAsns !== false;
-  const tiktokProfile = isTikTokCampaign(campaign);
-  // TikTok Ads: headers mais rigidos por padrao (da pra desligar com strictHeaders: false explicito so se quiser)
+  const profile = getProfile(campaign);
+  const tiktokProfile = profile.key === 'tiktok';
+  // Cada plataforma tem um default de strictHeaders; usuario ainda pode sobrepor (true/false explicito)
+  const defaultStrict = profile?.defaults?.strictHeaders === true;
   const strictHeaders =
-    protection.strictHeaders === true || (tiktokProfile && protection.strictHeaders !== false);
+    protection.strictHeaders === true || (defaultStrict && protection.strictHeaders !== false);
   const platformAgents = isPlatformAgentsEnabled(protection);
 
   // Test mode cookie (mesmo IP do token, 1h) → sempre URL principal
@@ -413,10 +473,9 @@ export function evaluateRequest(input, campaign, state = {}) {
   }
 
   // 0b) HARD: crawlers/agents de plataforma (Bytespider, Meta external, etc.)
-  //     NAO inclui webview in-app do TikTok (usuario real do anuncio).
+  //     NAO inclui webview in-app legitimo da plataforma (usuario real clicando no anuncio).
   if (platformAgents && userAgent && HARD_BLOCK_UA_PATTERN.test(userAgent)) {
-    // Protecao: se for claramente in-app legitimo sem "spider", nao hard-block
-    const isInApp = TIKTOK_INAPP_UA_PATTERN.test(userAgent);
+    const isInApp = isInAppWebview(userAgent, profile);
     const isSpider = /(spider|crawler|bot|externalhit|externalagent|externalfetcher)/i.test(userAgent);
     if (!isInApp || isSpider) {
       recordHit(input, state);
@@ -431,7 +490,7 @@ export function evaluateRequest(input, campaign, state = {}) {
     }
   }
 
-  // 0c) HARD: ASN da ByteDance/TikTok (agentes de review na rede da empresa)
+  // 0c) HARD: ASN de plataforma (agentes de review na rede da empresa)
   if (platformAgents && asn && isPlatformAgentAsn(asn)) {
     recordHit(input, state);
     return fallbackResult({
@@ -567,10 +626,15 @@ export function evaluateRequest(input, campaign, state = {}) {
     reasons.push('blocked_asn');
   }
 
-  // 8) Rate limit por IP (TikTok ads: um pouco mais rígido se perfil)
+  // 8) Rate limit por IP (perfil pode ser mais restrito)
   const recentHits = getRecentHits(input, state);
-  const baseLimit = Number(protection.rateLimitPerMinute || config.defaults.rateLimitPerMinute);
-  const limit = tiktokProfile ? Math.min(baseLimit, 12) : baseLimit;
+  const baseLimit = Number(
+    protection.rateLimitPerMinute ||
+    profile?.defaults?.rateLimitPerMinute ||
+    config.defaults.rateLimitPerMinute
+  );
+  const profileLimit = profile?.defaults?.rateLimitPerMinute;
+  const limit = profileLimit ? Math.min(baseLimit, profileLimit) : baseLimit;
   if (recentHits.length >= limit) {
     riskScore += 45;
     reasons.push('rate_limit_exceeded');
@@ -582,11 +646,11 @@ export function evaluateRequest(input, campaign, state = {}) {
     reasons.push('browser_headers_present');
   }
 
-  // TikTok Ads: limiar mais baixo (agentes “quase browser” precisam de menos pontos pra cair na alternativa)
+  // Perfil agressivo (TikTok e afins): cap mais baixo
   let threshold = resolveThreshold(campaign, protection);
-  if (tiktokProfile) {
-    const cap = campaign.mode === 'Protecao com fallback agressivo' ? 22 : 30;
-    threshold = Math.min(threshold, cap);
+  const profileCap = profile?.defaults?.lowerThreshold?.(campaign.mode);
+  if (typeof profileCap === 'number') {
+    threshold = Math.min(threshold, profileCap);
   }
 
   const suspicious = riskScore >= threshold;

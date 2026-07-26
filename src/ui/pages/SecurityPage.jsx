@@ -16,7 +16,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserX
-} from 'lucide-react';
+} from '../icons.jsx';
 import { useState } from 'react';
 import { MetricCard } from '../components/MetricCard.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
@@ -204,7 +204,8 @@ export function SecurityPage({
     <>
       <PageHeader
         title="Seguranca"
-        subtitle="Suas listas (so suas campanhas). Preencha com as dicas de cada card."
+        breadcrumb="Operacao / Seguranca"
+        subtitle="Listas e bloqueios aplicados as suas campanhas. Use as dicas de cada card."
         action={
           <button className="ghost-button" onClick={refreshData} type="button">
             <RefreshCw size={18} />

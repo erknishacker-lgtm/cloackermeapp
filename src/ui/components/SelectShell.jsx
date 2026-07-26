@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '../icons.jsx';
 
 export function SelectShell({ children, wide }) {
   return (

@@ -299,6 +299,25 @@ describe('evaluateRequest', () => {
     expect(result.decision).toBe('fallback');
     expect(result.riskScore).toBeGreaterThanOrEqual(25);
   });
+
+  test.each([
+    ['ChatGPT-User', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; ChatGPT-User; +https://openai.com/bot)'],
+    ['GPTBot', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; GPTBot/1.0; +https://openai.com/bot)'],
+    ['OAI-SearchBot', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; OAI-SearchBot/1.0; +https://openai.com/bot)'],
+    ['OAI-Crawler', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; OAI-Crawler/1.0; +https://openai.com/bot)'],
+    ['PerplexityBot', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)'],
+    ['Perplexity-User', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexitybot)'],
+    ['Perplexity-AI', 'Mozilla/5.0 AppleWebKit/537.36 (compatible; Perplexity-AI/1.0)'],
+    ['ClaudeBot', 'ClaudeBot/1.0 (claude-bot@anthropic.com)'],
+    ['Claude-Web', 'Claude-Web/1.0'],
+    ['Bingbot', 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)'],
+    ['MSNBot', 'msnbot/2.0b (+http://search.msn.com/msnbot.htm)']
+  ])('hard-blocks %s crawler to fallback', (label, userAgent) => {
+    const result = evaluateRequest(request({ userAgent }), campaign, { hitsByIp: new Map() });
+    expect(result.decision).toBe('fallback');
+    expect(result.targetUrl).toBe('https://example.com/safe');
+    expect(result.reasons).toContain('platform_agent_user_agent');
+  });
 });
 
 describe('trackViolation', () => {

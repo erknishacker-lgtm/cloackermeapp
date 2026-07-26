@@ -1,4 +1,4 @@
-import { BarChart3 } from 'lucide-react';
+import { BarChart3 } from '../icons.jsx';
 import { useMemo, useState } from 'react';
 
 function linePath(points, index, max = 10) {

@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/DashboardPage.jsx';
 import { DomainsPage } from './pages/DomainsPage.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { PlansPage } from './pages/PlansPage.jsx';
+import { ReportsPage } from './pages/ReportsPage.jsx';
 import { SecurityPage } from './pages/SecurityPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { TutorialPage } from './pages/TutorialPage.jsx';
@@ -110,15 +111,22 @@ export default function App() {
 
   if (!authChecked) {
     return (
-      <div className="login-shell">
-        <div className="login-stack">
-          <div className="login-brand">
-            <img src="/logo.png?v=2" alt="Cloaker.lol" className="brand-logo large" />
+      <div className="login-shell login-split">
+        <aside className="login-hero">
+          <div className="login-hero-inner">
+            <div className="login-hero-brand">
+              <img src="/logo.png?v=zghost8" alt="" className="login-ghost-logo sm" />
+              <strong className="brand-word">zGhost</strong>
+            </div>
+            <h1>Carregando painel</h1>
+            <p>Preparando sua sessao...</p>
           </div>
-          <div className="panel login-card">
-            <p className="login-subtitle">Carregando...</p>
+        </aside>
+        <main className="login-main">
+          <div className="login-card-v2">
+            <p className="login-loading-text">Aguarde...</p>
           </div>
-        </div>
+        </main>
       </div>
     );
   }
@@ -139,9 +147,13 @@ export default function App() {
       />
     );
   } else if (activePage === 'dashboard') {
-    page = <DashboardPage stats={data.stats} events={data.events} />;
+    page = (
+      <DashboardPage setActivePage={setActivePage} isAdmin={isAdmin} events={data.events} />
+    );
   } else if (activePage === 'access') {
     page = <AccessPage events={data.events} stats={data.stats} refreshData={data.refreshData} />;
+  } else if (activePage === 'reports') {
+    page = <ReportsPage events={data.events} campaigns={data.campaigns} />;
   } else if (activePage === 'domains') {
     page = (
       <DomainsPage
@@ -176,8 +188,13 @@ export default function App() {
         refreshUsers={data.refreshUsers}
       />
     );
-  } else if (activePage === 'plans' && isAdmin) {
-    page = <PlansPage />;
+  } else if (activePage === 'plans') {
+    page = (
+      <PlansPage
+        setActivePage={setActivePage}
+        currentPlanId={data.settings?.planId || 'start'}
+      />
+    );
   } else if (activePage === 'settings') {
     page = (
       <SettingsPage
@@ -185,6 +202,10 @@ export default function App() {
         saveSettings={data.saveSettings}
         changePassword={data.changePassword}
         isAdmin={isAdmin}
+        user={user}
+        setActivePage={setActivePage}
+        eventsCount={Array.isArray(data.events) ? data.events.length : 0}
+        domainsCount={Array.isArray(data.domains) ? data.domains.length : 0}
       />
     );
   } else {
@@ -207,19 +228,25 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar activePage={activePage} setActivePage={setActivePage} user={user} onLogout={logout} />
+      <Sidebar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        user={user}
+        onLogout={logout}
+        campaignCount={data.campaigns?.length || 0}
+      />
       <main className={`content page-${activePage}`}>
         <div className="topbar">
-          <div className="topbar-title">
-            {activePage === 'tutorial' ? 'Tutorial' : null}
+          <div className="topbar-title" />
+          <div className="topbar-actions">
+            <NotificationBell
+              enabled={data.settings?.accessNotificationsEnabled !== false}
+              onOpenAccess={() => {
+                setActivePage('access');
+                data.refreshData();
+              }}
+            />
           </div>
-          <NotificationBell
-            enabled={data.settings?.accessNotificationsEnabled !== false}
-            onOpenAccess={() => {
-              setActivePage('access');
-              data.refreshData();
-            }}
-          />
         </div>
         {data.error && <div className="message error-banner">{data.error}</div>}
         {page}

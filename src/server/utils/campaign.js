@@ -1,5 +1,6 @@
 import { slugify } from './slugify.js';
 import { config } from '../config.js';
+import { detectPlatformProfile } from './platforms.js';
 
 function isTikTokPlatform(platform) {
   const p = String(platform || '').toLowerCase();
@@ -9,10 +10,11 @@ function isTikTokPlatform(platform) {
 export function toCampaign(body = {}) {
   const slug = slugify(body.slug || body.name);
   const platform = body.platform || 'Personalizado / Outro';
+  const profile = detectPlatformProfile({ platform });
   const tiktok = isTikTokPlatform(platform);
-  // TikTok: default mais agressivo (agentes de review passam em “modo suave”)
-  const mode =
-    body.mode || (tiktok ? 'Protecao com fallback agressivo' : 'Protecao server-side');
+  // Padrão vem do perfil da plataforma (TikTok agressivo por padrão; demais usam 'Protecao server-side')
+  const defaultMode = profile?.defaults?.mode || 'Protecao server-side';
+  const mode = body.mode || defaultMode;
   const defaultThreshold =
     mode === 'Protecao com fallback agressivo'
       ? config.defaults.aggressiveThreshold
@@ -62,7 +64,27 @@ export function toCampaign(body = {}) {
       blockPlatformAgents: parseBool(
         body.blockPlatformAgents ?? body.protection?.blockPlatformAgents,
         true
-      )
+      ),
+      // Metadados do formulario Cloakup (UI) — nao quebram o motor
+      ...(body.protection && typeof body.protection === 'object'
+        ? Object.fromEntries(
+            Object.entries(body.protection).filter(
+              ([key]) =>
+                ![
+                  'enabled',
+                  'rateLimitPerMinute',
+                  'fallbackThreshold',
+                  'blockedCountries',
+                  'blockedAsns',
+                  'blockedUserAgents',
+                  'blockedIps',
+                  'blockDatacenterAsns',
+                  'strictHeaders',
+                  'blockPlatformAgents'
+                ].includes(key)
+            )
+          )
+        : {})
     }
   };
 }

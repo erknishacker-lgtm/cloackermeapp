@@ -28,6 +28,7 @@ function emptyState(seedDemo = false) {
     customDomains: [],
     users: [createOwnerUser()],
     sessions: {},
+    pending2fa: {},
     testModes: {},
     notifications: [],
     settings: {
@@ -35,7 +36,15 @@ function emptyState(seedDemo = false) {
       autoBlockEnabled: true,
       accessNotificationsEnabled: true,
       operatorEmail: 'louzada@cloaker.lol',
-      supportWhatsapp: ''
+      supportWhatsapp: '',
+      displayName: '',
+      phone: '',
+      country: 'BR',
+      document: '',
+      planId: 'start',
+      apiKey: '',
+      paymentMethods: [],
+      invoices: []
     }
   };
 }
@@ -51,6 +60,7 @@ function hydrateMaps(raw) {
     blockedIps: new Map(Object.entries(raw.blockedIps || {})),
     violationsByIp: new Map(Object.entries(raw.violationsByIp || {})),
     sessions: new Map(Object.entries(raw.sessions || {})),
+    pending2fa: new Map(Object.entries(raw.pending2fa || {})),
     testModes: new Map(Object.entries(raw.testModes || {})),
     campaigns,
     events: raw.events || [],
@@ -88,6 +98,7 @@ function serializeState(store) {
     blockedIps: Object.fromEntries(store.blockedIps),
     violationsByIp: Object.fromEntries(store.violationsByIp),
     sessions: Object.fromEntries(store.sessions),
+    pending2fa: Object.fromEntries(store.pending2fa || new Map()),
     testModes: Object.fromEntries(store.testModes || new Map()),
     routeLists: normalizeRouteLists(store.routeLists),
     userRouteLists: normalizeUserRouteListsMap(store.userRouteLists || {}),
@@ -151,6 +162,11 @@ export function createStore(options = {}) {
         state.sessions.delete(token);
       }
     }
+    for (const [token, pending] of (state.pending2fa || new Map()).entries()) {
+      if (pending.expiresAt && new Date(pending.expiresAt).getTime() <= now) {
+        state.pending2fa.delete(token);
+      }
+    }
     for (const [token, test] of state.testModes.entries()) {
       if (test.expiresAt && new Date(test.expiresAt).getTime() <= now) {
         state.testModes.delete(token);
@@ -205,6 +221,10 @@ export function createStore(options = {}) {
     },
     get sessions() {
       return state.sessions;
+    },
+    get pending2fa() {
+      if (!state.pending2fa) state.pending2fa = new Map();
+      return state.pending2fa;
     },
     get testModes() {
       return state.testModes;

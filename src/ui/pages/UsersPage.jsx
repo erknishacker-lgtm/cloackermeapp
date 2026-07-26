@@ -1,4 +1,4 @@
-import { Plus, Trash2, UserCog, UserX } from 'lucide-react';
+import { Plus, Trash2, UserCog, UserX } from '../icons.jsx';
 import { useEffect, useState } from 'react';
 import { Field } from '../components/Field.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
@@ -34,8 +34,9 @@ export function UsersPage({ users, createUser, updateUser, deleteUser, refreshUs
   return (
     <>
       <PageHeader
-        title="Gerenciar Usuarios"
-        subtitle="Cadastro manual de clientes (somente admin). Stripe depois."
+        title="Usuarios"
+        breadcrumb="Administracao / Usuarios"
+        subtitle="Cadastro manual de clientes (somente admin)."
         icon={UserCog}
       />
 
