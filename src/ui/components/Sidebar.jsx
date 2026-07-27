@@ -102,7 +102,7 @@ export function Sidebar({ activePage, setActivePage, user, onLogout, campaignCou
         </button>
         <div className="mobile-brand">
           <img src={LOGO_SRC} alt="" className="mobile-logo" />
-          <strong className="brand-word">zGhost</strong>
+          <strong className="brand-word">zGhost Cloaker</strong>
         </div>
         <span className="mobile-user-initial" title={accountLabel()}>
           {(accountLabel().charAt(0) || 'U').toUpperCase()}
@@ -116,7 +116,7 @@ export function Sidebar({ activePage, setActivePage, user, onLogout, campaignCou
       <aside className={open ? 'sidebar open' : 'sidebar'}>
         <div className="brand">
           <img src={LOGO_SRC} alt="" className="brand-logo" />
-          <strong className="brand-word">zGhost</strong>
+          <strong className="brand-word">zGhost Cloaker</strong>
         </div>
 
         <nav className="nav" aria-label="Principal">

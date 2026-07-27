@@ -83,7 +83,7 @@ export function LoginPage({ onLoggedIn }) {
         <div className="login-hero-inner">
           <div className="login-hero-brand login-hero-brand-stack">
             <img src={LOGO_SRC} alt="" className="login-ghost-logo lg" />
-            <strong className="brand-word">zGhost</strong>
+            <strong className="brand-word">zGhost Cloaker</strong>
           </div>
           <h1>Console de roteamento anti-bot</h1>
           <p>

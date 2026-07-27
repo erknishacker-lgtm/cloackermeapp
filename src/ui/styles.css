@@ -188,6 +188,10 @@ button {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.sidebar .brand-word {
+  font-size: 1.1em;
+}
+
 .brand-mark {
   display: grid;
   width: 36px;

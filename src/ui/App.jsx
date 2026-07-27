@@ -116,7 +116,7 @@ export default function App() {
           <div className="login-hero-inner">
             <div className="login-hero-brand">
               <img src="/logo.png?v=zghost8" alt="" className="login-ghost-logo sm" />
-              <strong className="brand-word">zGhost</strong>
+              <strong className="brand-word">zGhost Cloaker</strong>
             </div>
             <h1>Carregando painel</h1>
             <p>Preparando sua sessao...</p>
