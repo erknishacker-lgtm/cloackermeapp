@@ -621,6 +621,14 @@ export function evaluateRequest(input, campaign, state = {}) {
     reasons.push('blocked_country');
   }
 
+  // 7b) Whitelist de pais: se configurada, so os paises da lista podem passar —
+  // qualquer outro pais (ou pais nao detectado) cai na pagina segura.
+  const allowedCountries = (protection.allowedCountries || []).map((item) => item.toUpperCase());
+  if (allowedCountries.length && !allowedCountries.includes(country || '')) {
+    riskScore += 60;
+    reasons.push('country_not_allowed');
+  }
+
   if (asn && (protection.blockedAsns || []).map((item) => normalizeAsn(item)).includes(asn)) {
     riskScore += 50;
     reasons.push('blocked_asn');

@@ -79,7 +79,7 @@ function emptyDraft(domainDefault) {
     domain: domainDefault || '',
     platform: 'TikTok',
     devices: { mobile: true, tablet: true, desktop: true },
-    country: '',
+    countries: [],
     countryMode: 'allow',
     language: '',
     languageMode: 'allow',
@@ -139,12 +139,11 @@ function draftToApiBody(draft) {
   if (draft.adspy) uas.push('adspy, spyfu, similarweb, semrush');
   if (draft.blockedBrowsers) uas.push(draft.blockedBrowsers);
 
-  let blockedCountries = '';
-  if (draft.country) {
-    // allow = bloquear todos EXCETO o pais → no motor atual so temos block list;
-    // se allow: deixamos vazio e documentamos; se block: adiciona o pais
-    if (draft.countryMode === 'block') blockedCountries = draft.country;
-  }
+  const countryList = Array.isArray(draft.countries) ? draft.countries.filter(Boolean) : [];
+  // block = bloqueia so os paises marcados (resto passa);
+  // allow = so os paises marcados passam (resto cai na pagina segura)
+  const blockedCountries = draft.countryMode === 'block' ? countryList : [];
+  const allowedCountries = draft.countryMode === 'allow' ? countryList : [];
 
   return {
     name: draft.name,
@@ -175,7 +174,8 @@ function draftToApiBody(draft) {
       language: draft.language || '',
       languageMode: draft.languageMode || 'allow',
       countryMode: draft.countryMode || 'allow',
-      selectedCountry: draft.country || '',
+      countries: countryList,
+      allowedCountries,
       devices: draft.devices,
       osList: draft.osList || [],
       osMode: draft.osMode || 'allow',
@@ -217,8 +217,12 @@ function campaignToDraft(campaign, domainDefault) {
       tablet: dest.mobile !== 'fallback',
       desktop: dest.desktop !== 'fallback'
     },
-    country: p.selectedCountry || (Array.isArray(p.blockedCountries) ? p.blockedCountries[0] : '') || '',
-    countryMode: p.countryMode || 'allow',
+    countries:
+      (Array.isArray(p.countries) && p.countries.length && p.countries) ||
+      (Array.isArray(p.allowedCountries) && p.allowedCountries.length && p.allowedCountries) ||
+      (Array.isArray(p.blockedCountries) && p.blockedCountries.length && p.blockedCountries) ||
+      (p.selectedCountry ? [p.selectedCountry] : []),
+    countryMode: p.countryMode || (Array.isArray(p.allowedCountries) && p.allowedCountries.length ? 'allow' : 'block'),
     language: p.language || '',
     languageMode: p.languageMode || 'allow',
     emReview: Boolean(p.forceSafePage),
@@ -266,6 +270,32 @@ function NetworkPicker({ value, onChange }) {
           <span className="network-radio" aria-hidden />
         </button>
       ))}
+    </div>
+  );
+}
+
+function CountryPicker({ selected, onChange }) {
+  const list = Array.isArray(selected) ? selected : [];
+  return (
+    <div className="os-grid">
+      {COUNTRY_OPTIONS.map((c) => {
+        const on = list.includes(c.code);
+        return (
+          <button
+            key={c.code}
+            type="button"
+            className={`os-chip ${on ? 'selected' : ''}`}
+            onClick={() => {
+              const set = new Set(list);
+              if (set.has(c.code)) set.delete(c.code);
+              else set.add(c.code);
+              onChange([...set]);
+            }}
+          >
+            {c.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -704,17 +734,26 @@ export function CampaignsPage({
 
           <section className="camp-block">
             <h2>Localizacao</h2>
-            <Field label="Pais">
-              <SelectShell>
-                <select value={draft.country} onChange={(e) => setD('country', e.target.value)}>
-                  <option value="">Selecione um pais...</option>
-                  {COUNTRY_OPTIONS.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </SelectShell>
+            <UiRadioGroup
+              name="countryMode"
+              className="ui-radio-row"
+              size="sm"
+              value={draft.countryMode}
+              onChange={(v) => setD('countryMode', v)}
+              options={[
+                { value: 'allow', label: 'Permitir apenas os marcados' },
+                { value: 'block', label: 'Bloquear os marcados' }
+              ]}
+            />
+            <Field
+              label="Paises"
+              hint={
+                draft.countryMode === 'allow'
+                  ? 'So visitantes desses paises acessam a oferta; todo o resto cai na pagina segura.'
+                  : 'Visitantes desses paises caem na pagina segura; o resto acessa normalmente.'
+              }
+            >
+              <CountryPicker selected={draft.countries} onChange={(v) => setD('countries', v)} />
             </Field>
           </section>
 
@@ -776,33 +815,6 @@ export function CampaignsPage({
                     size="sm"
                   />
                 </div>
-              </section>
-
-              <section className="camp-block">
-                <h2>Filtro de pais</h2>
-                <UiRadioGroup
-                  name="countryMode"
-                  className="ui-radio-row"
-                  size="sm"
-                  value={draft.countryMode}
-                  onChange={(v) => setD('countryMode', v)}
-                  options={[
-                    { value: 'allow', label: 'Permitir (selecionado)' },
-                    { value: 'block', label: 'Bloquear (selecionado)' }
-                  ]}
-                />
-                <Field label="Pais">
-                  <SelectShell>
-                    <select value={draft.country} onChange={(e) => setD('country', e.target.value)}>
-                      <option value="">Selecione um pais...</option>
-                      {COUNTRY_OPTIONS.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </SelectShell>
-                </Field>
               </section>
 
               <section className="camp-block">
