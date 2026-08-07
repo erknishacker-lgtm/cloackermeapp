@@ -217,12 +217,16 @@ function campaignToDraft(campaign, domainDefault) {
       tablet: dest.mobile !== 'fallback',
       desktop: dest.desktop !== 'fallback'
     },
-    countries:
-      (Array.isArray(p.countries) && p.countries.length && p.countries) ||
-      (Array.isArray(p.allowedCountries) && p.allowedCountries.length && p.allowedCountries) ||
-      (Array.isArray(p.blockedCountries) && p.blockedCountries.length && p.blockedCountries) ||
-      (p.selectedCountry ? [p.selectedCountry] : []),
-    countryMode: p.countryMode || (Array.isArray(p.allowedCountries) && p.allowedCountries.length ? 'allow' : 'block'),
+    // OBS: "selectedCountry" era um campo decorativo do formulario antigo — no motor
+    // anterior o modo "permitir" nunca bloqueava nada, entao esse valor pode estar
+    // preenchido sem nenhuma intencao real de restringir. NUNCA usar como fonte de
+    // uma whitelist ativa; so os campos novos (allowedCountries/blockedCountries,
+    // que sempre refletiram enforcement real) alimentam o draft.
+    ...(Array.isArray(p.allowedCountries) && p.allowedCountries.length
+      ? { countries: p.allowedCountries, countryMode: 'allow' }
+      : Array.isArray(p.blockedCountries) && p.blockedCountries.length
+        ? { countries: p.blockedCountries, countryMode: 'block' }
+        : { countries: [], countryMode: 'block' }),
     language: p.language || '',
     languageMode: p.languageMode || 'allow',
     emReview: Boolean(p.forceSafePage),
